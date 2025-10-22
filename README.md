@@ -1,16 +1,17 @@
 # Claude Task Automation Server
 
-A Python-based HTTP request/response system that automates task completion using Claude AI. This system creates sessions, manages tasks, generates test cases, and validates implementations through both generated and regression tests.
+A Python-based HTTP request/response system that automates task completion using Claude AI. This system manages tasks with full lifecycle control, intelligent auto-responses, git worktree isolation, and automated testing.
 
 ## Features
 
-- **Session Management**: Create sessions for different projects
+- **Task Lifecycle Management**: Create, start, stop, and resume tasks with full control
+- **Git Worktree Isolation**: Parallel task execution on same project using isolated branches
+- **Intelligent Auto-Responses**: Context-aware replies to Claude's questions
 - **Task Execution**: Asynchronous task execution using Claude Code CLI
-- **Simulated Human Interaction**: Automated encouragement and continuation prompts
-- **Test Generation**: Automatic test case generation for each task
-- **Regression Testing**: Support for regression test suites
-- **Status Tracking**: Real-time task status and progress monitoring
+- **Real-time Monitoring**: Track Claude's responses and task progress
+- **Test Generation**: Automatic test case generation and validation
 - **CLI-Based**: Uses your local Claude Code CLI (no API key needed!)
+- **Simple API**: Task name-based endpoints (no manual session management)
 
 ## Architecture
 
@@ -86,44 +87,93 @@ uvicorn app.main:app --reload
 
 The server will start on `http://localhost:8000`. API documentation is available at `http://localhost:8000/docs`.
 
-### API Endpoints
+### Quick Start
 
-#### Create a Session
-
-```bash
-curl -X POST http://localhost:8000/api/v1/sessions \
-  -H "Content-Type: application/json" \
-  -d '{"project_path": "/path/to/your/project"}'
-```
-
-Response:
-```json
-{
-  "id": "session-uuid",
-  "project_path": "/path/to/your/project",
-  "created_at": "2024-01-01T00:00:00",
-  "updated_at": "2024-01-01T00:00:00"
-}
-```
-
-#### Create a Task
+**1. Create a task (doesn't auto-start):**
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "session-uuid",
-    "description": "Create a Python function to calculate fibonacci numbers"
+    "task_name": "add-login-feature",
+    "description": "Implement user login with OAuth",
+    "root_folder": "/path/to/your/project",
+    "auto_start": false
   }'
+```
+
+**2. Start the task when ready:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/tasks/by-name/add-login-feature/start
+```
+
+**3. Monitor progress:**
+
+```bash
+curl http://localhost:8000/api/v1/tasks/by-name/add-login-feature/status
+```
+
+**4. Stop/resume if needed:**
+
+```bash
+# Stop
+curl -X POST http://localhost:8000/api/v1/tasks/by-name/add-login-feature/stop
+
+# Resume
+curl -X POST http://localhost:8000/api/v1/tasks/by-name/add-login-feature/resume
+```
+
+### API Endpoints
+
+#### Task Management
+
+**Create Task:**
+```bash
+POST /api/v1/tasks
+{
+  "task_name": "my-task",
+  "description": "Task description",
+  "root_folder": "/path/to/project",
+  "auto_start": false  // default: false
+}
+```
+
+**Start Task:**
+```bash
+POST /api/v1/tasks/by-name/{task_name}/start
+```
+
+**Stop Task:**
+```bash
+POST /api/v1/tasks/by-name/{task_name}/stop
+```
+
+**Resume Task:**
+```bash
+POST /api/v1/tasks/by-name/{task_name}/resume
+```
+
+**Get Task Status:**
+```bash
+GET /api/v1/tasks/by-name/{task_name}/status
 ```
 
 Response:
 ```json
 {
   "id": "task-uuid",
-  "session_id": "session-uuid",
-  "description": "Create a Python function to calculate fibonacci numbers",
-  "status": "pending",
+  "task_name": "add-login-feature",
+  "status": "running",
+  "progress": "Task is running - 5 interactions so far",
+  "latest_claude_response": "I'm implementing the login form...",
+  "waiting_for_input": false,
+  "test_summary": {
+    "total": 3,
+    "passed": 2,
+    "failed": 0,
+    "pending": 1
+  }
   "created_at": "2024-01-01T00:00:00",
   ...
 }
@@ -167,12 +217,18 @@ curl http://localhost:8000/api/v1/sessions/{session_id}/tasks
 
 ### Task Lifecycle
 
-1. **PENDING**: Task created and queued
+1. **PENDING**: Task created, waiting to be started
 2. **RUNNING**: Claude is actively working on the task
-3. **PAUSED**: Task paused, simulated human provides encouragement
-4. **TESTING**: Implementation complete, running tests
-5. **COMPLETED**: All tests passed successfully
-6. **FAILED**: Tests failed or execution error
+3. **PAUSED**: Task paused (internal), auto-response being generated
+4. **STOPPED**: Task manually stopped by user
+5. **TESTING**: Implementation complete, running tests
+6. **COMPLETED**: All tests passed successfully
+7. **FAILED**: Tests failed or execution error
+
+**Lifecycle Control:**
+- `PENDING` → `START` → `RUNNING`
+- `RUNNING` → `STOP` → `STOPPED`
+- `STOPPED` → `RESUME` → `RUNNING`
 
 ## How It Works
 
@@ -186,13 +242,15 @@ curl http://localhost:8000/api/v1/sessions/{session_id}/tasks
 6. **Test Validation**: Both generated and regression tests are run
 7. **Completion**: Task marked complete when all tests pass
 
-### Simulated Human Interaction
+### Intelligent Auto-Responses
 
-The system simulates human interaction by:
-- Providing continuation prompts every 3-5 interactions
-- Offering encouragement messages
-- Handling errors with appropriate guidance
-- Granting most permissions (except malicious operations)
+The system provides intelligent auto-responses by:
+- Analyzing Claude's responses for questions, choices, errors
+- Generating context-aware replies instead of generic prompts
+- Answering multiple choice questions intelligently
+- Handling yes/no questions with appropriate defaults
+- Suggesting alternatives when errors occur
+- Confirming completion and requesting verification
 
 ### Test Case Management
 
@@ -327,15 +385,34 @@ python -m app.main > server.log 2>&1
 - Consider adding authentication for production use
 - Review generated code before deploying to production
 
-## Future Enhancements
+## Documentation
 
-- [ ] Add authentication and authorization
-- [ ] Support multiple Claude models
-- [ ] Add WebSocket support for real-time updates
-- [ ] Implement task cancellation
-- [ ] Add code review integration
-- [ ] Support for multiple programming languages
-- [ ] Enhanced error recovery mechanisms
+Comprehensive documentation is available:
+
+- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute setup guide
+- **[TASK_LIFECYCLE.md](TASK_LIFECYCLE.md)** - Task lifecycle management (create/start/stop/resume)
+- **[GIT_WORKTREE_GUIDE.md](GIT_WORKTREE_GUIDE.md)** - Parallel task execution with git worktrees
+- **[PARALLEL_TASKS_DESIGN.md](PARALLEL_TASKS_DESIGN.md)** - Branch isolation for parallel tasks
+- **[INTELLIGENT_AUTO_ANSWER.md](INTELLIGENT_AUTO_ANSWER.md)** - Context-aware auto-response algorithm
+- **[TASK_STATUS_API.md](TASK_STATUS_API.md)** - Real-time task status and Claude responses
+- **[API_USAGE_GUIDE.md](API_USAGE_GUIDE.md)** - Complete API reference and usage
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
+- **[CLI_INTEGRATION.md](CLI_INTEGRATION.md)** - Claude CLI integration details
+
+## Examples
+
+Ready-to-use example scripts:
+
+```bash
+# Simple create and monitor
+python examples/simple_task_monitor.py "task-name" "description" /project
+
+# Bash version
+./examples/monitor_task.sh "task-name" "description" /project
+
+# Manual lifecycle control
+python examples/create_and_start.py "task-name" "description" /project
+```
 
 ## License
 
