@@ -288,10 +288,18 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
 @router.get("/tasks", response_model=List[TaskResponse])
 async def list_all_tasks(
     status: Optional[str] = None,
+    root_folder: Optional[str] = None,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    """List all tasks, optionally filtered by status."""
+    """
+    List all tasks, optionally filtered by status and/or root_folder.
+
+    Args:
+        status: Filter by task status (pending, running, paused, testing, completed, failed)
+        root_folder: Filter by project root folder path
+        limit: Maximum number of tasks to return (default: 100)
+    """
     query = db.query(Task)
 
     if status:
@@ -303,6 +311,9 @@ async def list_all_tasks(
                 status_code=400,
                 detail=f"Invalid status. Valid values: {[s.value for s in TaskStatus]}"
             )
+
+    if root_folder:
+        query = query.filter(Task.root_folder == root_folder)
 
     tasks = query.order_by(Task.created_at.desc()).limit(limit).all()
     return tasks
