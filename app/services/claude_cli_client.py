@@ -58,14 +58,10 @@ class ClaudeCLIClient:
             # Prepare command
             cmd = [self.cli_command]
 
-            # Add project path if provided
-            if project_path and os.path.exists(project_path):
-                cmd.extend(["--cwd", project_path])
-
             # Add message
             cmd.append(message)
 
-            # Execute command
+            # Execute command with working directory set via cwd parameter
             result = subprocess.run(
                 cmd,
                 capture_output=True,
