@@ -216,7 +216,7 @@ After using the web UI:
 
 ## Related Documentation
 
-- [README.md](README.md) - Main documentation
+- [README.md](../README.md) - Main documentation
 - [QUICKSTART.md](QUICKSTART.md) - 5-minute setup guide
 - [TASK_LIFECYCLE.md](TASK_LIFECYCLE.md) - Task lifecycle management
 - [API_USAGE_GUIDE.md](API_USAGE_GUIDE.md) - Complete API reference

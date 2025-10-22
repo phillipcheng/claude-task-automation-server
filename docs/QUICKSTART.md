@@ -190,7 +190,7 @@ curl http://localhost:8000/api/v1/tasks/{task_id}
 
 ## Next Steps
 
-- Read the full [README.md](README.md) for detailed documentation
+- Read the full [README.md](../README.md) for detailed documentation
 - Explore the API at http://localhost:8000/docs
 - Check out the example client in `example_client.py`
 - Add your own regression tests in `tests/`
@@ -198,7 +198,7 @@ curl http://localhost:8000/api/v1/tasks/{task_id}
 ## Support
 
 For issues and questions:
-- Check the [README.md](README.md)
+- Check the [README.md](../README.md)
 - Review the API documentation at `/docs`
 - Check server logs for errors
 

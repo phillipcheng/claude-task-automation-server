@@ -100,7 +100,7 @@ Open your browser and navigate to `http://localhost:8000/` to access the web int
 3. Monitor task progress in real-time
 4. Use Start/Stop/Resume buttons as needed
 
-See [WEB_UI_GUIDE.md](WEB_UI_GUIDE.md) for complete web UI documentation.
+See [WEB_UI_GUIDE.md](docs/WEB_UI_GUIDE.md) for complete web UI documentation.
 
 ### Quick Start (Command Line)
 
@@ -402,18 +402,18 @@ python -m app.main > server.log 2>&1
 
 ## Documentation
 
-Comprehensive documentation is available:
+Comprehensive documentation is available in the [`docs/`](docs/) folder:
 
-- **[WEB_UI_GUIDE.md](WEB_UI_GUIDE.md)** - Web interface user guide
-- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute setup guide
-- **[TASK_LIFECYCLE.md](TASK_LIFECYCLE.md)** - Task lifecycle management (create/start/stop/resume)
-- **[GIT_WORKTREE_GUIDE.md](GIT_WORKTREE_GUIDE.md)** - Parallel task execution with git worktrees
-- **[PARALLEL_TASKS_DESIGN.md](PARALLEL_TASKS_DESIGN.md)** - Branch isolation for parallel tasks
-- **[INTELLIGENT_AUTO_ANSWER.md](INTELLIGENT_AUTO_ANSWER.md)** - Context-aware auto-response algorithm
-- **[TASK_STATUS_API.md](TASK_STATUS_API.md)** - Real-time task status and Claude responses
-- **[API_USAGE_GUIDE.md](API_USAGE_GUIDE.md)** - Complete API reference and usage
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
-- **[CLI_INTEGRATION.md](CLI_INTEGRATION.md)** - Claude CLI integration details
+- **[WEB_UI_GUIDE.md](docs/WEB_UI_GUIDE.md)** - Web interface user guide
+- **[QUICKSTART.md](docs/QUICKSTART.md)** - 5-minute setup guide
+- **[TASK_LIFECYCLE.md](docs/TASK_LIFECYCLE.md)** - Task lifecycle management (create/start/stop/resume)
+- **[GIT_WORKTREE_GUIDE.md](docs/GIT_WORKTREE_GUIDE.md)** - Parallel task execution with git worktrees
+- **[PARALLEL_TASKS_DESIGN.md](docs/PARALLEL_TASKS_DESIGN.md)** - Branch isolation for parallel tasks
+- **[INTELLIGENT_AUTO_ANSWER.md](docs/INTELLIGENT_AUTO_ANSWER.md)** - Context-aware auto-response algorithm
+- **[TASK_STATUS_API.md](docs/TASK_STATUS_API.md)** - Real-time task status and Claude responses
+- **[API_USAGE_GUIDE.md](docs/API_USAGE_GUIDE.md)** - Complete API reference and usage
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and design
+- **[CLI_INTEGRATION.md](docs/CLI_INTEGRATION.md)** - Claude CLI integration details
 
 ## Examples
 
