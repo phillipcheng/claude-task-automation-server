@@ -389,6 +389,59 @@ async def resume_task(
     return {"message": f"Task '{task_name}' resumed", "status": "running"}
 
 
+@router.get("/tasks/by-name/{task_name}/conversation")
+async def get_task_conversation(task_name: str, db: Session = Depends(get_db)):
+    """Get the full conversation history for a task (all interactions)."""
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    # Get all interactions ordered by creation time
+    interactions = sorted(task.interactions, key=lambda x: x.created_at)
+
+    return {
+        "task_name": task.task_name,
+        "status": task.status,
+        "conversation": [
+            {
+                "id": interaction.id,
+                "type": interaction.interaction_type.value,
+                "content": interaction.content,
+                "timestamp": interaction.created_at.isoformat()
+            }
+            for interaction in interactions
+        ]
+    }
+
+
+@router.post("/tasks/by-name/{task_name}/set-input")
+async def set_custom_human_input(
+    task_name: str,
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Set custom human input for the next interaction.
+    The task will use this instead of auto-generated response when resumed.
+    """
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    if "input" not in request:
+        raise HTTPException(status_code=400, detail="Missing 'input' field in request body")
+
+    # Store the custom input
+    task.custom_human_input = request["input"]
+    db.commit()
+
+    return {
+        "message": "Custom input set successfully",
+        "task_name": task_name,
+        "input_preview": request["input"][:100] + "..." if len(request["input"]) > 100 else request["input"]
+    }
+
+
 @router.delete("/tasks/by-name/{task_name}")
 async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db: Session = Depends(get_db)):
     """Delete a task by name and optionally cleanup its worktree."""

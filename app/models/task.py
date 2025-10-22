@@ -35,6 +35,9 @@ class Task(Base):
     summary = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
 
+    # Human-in-the-loop: Custom input to override auto-generated response
+    custom_human_input = Column(Text, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

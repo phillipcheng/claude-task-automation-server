@@ -138,19 +138,34 @@ Start implementing now."""
                         # Wait a bit to simulate human thinking
                         await asyncio.sleep(1)
 
-                        # Generate intelligent response based on Claude's output
-                        human_prompt = self.intelligent_responder.generate_response(
-                            claude_response=last_response,
-                            task_description=task.description,
-                            iteration=iteration
-                        )
+                        # Check if user provided custom input (human-in-the-loop)
+                        db.refresh(task)  # Refresh to get latest custom_human_input
+                        if task.custom_human_input:
+                            # Use custom input instead of auto-generated
+                            human_prompt = task.custom_human_input
+
+                            # Clear the custom input after using it
+                            task.custom_human_input = None
+                            db.commit()
+
+                            # Save as REAL human interaction
+                            self._save_interaction(
+                                db, task.id, InteractionType.USER_REQUEST, human_prompt
+                            )
+                        else:
+                            # Generate intelligent response based on Claude's output
+                            human_prompt = self.intelligent_responder.generate_response(
+                                claude_response=last_response,
+                                task_description=task.description,
+                                iteration=iteration
+                            )
+
+                            # Save simulated human interaction
+                            self._save_interaction(
+                                db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt
+                            )
 
                         message_to_send = human_prompt
-
-                        # Save simulated human interaction
-                        self._save_interaction(
-                            db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt
-                        )
 
                         task.status = TaskStatus.RUNNING
                         db.commit()
