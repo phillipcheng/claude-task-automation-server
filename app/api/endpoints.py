@@ -129,6 +129,7 @@ async def create_task(
 
     # Auto-detect git info if not provided
     branch_name = task_data.branch_name
+    base_branch = task_data.base_branch
     git_repo = None
     worktree_path = None
     actual_working_dir = root_folder
@@ -136,6 +137,10 @@ async def create_task(
     if root_folder and os.path.exists(root_folder):
         detected_branch, detected_repo = get_git_info(root_folder)
         git_repo = detected_repo
+
+        # If base_branch not provided, use detected current branch
+        if not base_branch:
+            base_branch = detected_branch
 
         # For git repos, validate branch requirements
         if git_repo:
@@ -177,7 +182,8 @@ async def create_task(
             if GitWorktreeManager.is_worktree_supported(root_folder):
                 success, wt_path, message = worktree_manager.create_worktree(
                     task_data.task_name,
-                    branch_name
+                    branch_name,
+                    base_branch
                 )
 
                 if success:
@@ -206,6 +212,7 @@ async def create_task(
         description=task_data.description,
         root_folder=root_folder,
         branch_name=branch_name,
+        base_branch=base_branch,
         git_repo=git_repo,
         worktree_path=worktree_path,
         status=TaskStatus.PENDING,

@@ -501,6 +501,13 @@
                     <label for="branchName">Branch Name (optional)</label>
                     <input type="text" id="branchName" placeholder="Leave empty for auto-generation">
                 </div>
+                <div class="form-group">
+                    <label for="baseBranch">Base Branch (optional)</label>
+                    <input type="text" id="baseBranch" placeholder="e.g., main, develop, master (auto-detected if empty)">
+                    <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">
+                        Branch to branch off from when creating the new task branch
+                    </small>
+                </div>
                 <div class="form-group checkbox-group">
                     <input type="checkbox" id="useWorktree" checked>
                     <label for="useWorktree">Use Git Worktree (recommended for parallel tasks)</label>
@@ -692,6 +699,7 @@
                 description: document.getElementById('description').value,
                 root_folder: rootFolder,
                 branch_name: document.getElementById('branchName').value || null,
+                base_branch: document.getElementById('baseBranch').value || null,
                 use_worktree: document.getElementById('useWorktree').checked,
                 auto_start: document.getElementById('autoStart').checked
             };
@@ -802,6 +810,10 @@
 
             if (task.branch_name) {
                 details.push(`<div class="task-detail-item"><span class="task-detail-label">🌿 Branch:</span><span class="task-detail-value">${task.branch_name}</span></div>`);
+            }
+
+            if (task.base_branch) {
+                details.push(`<div class="task-detail-item"><span class="task-detail-label">⚡ Base Branch:</span><span class="task-detail-value">${task.base_branch}</span></div>`);
             }
 
             if (task.worktree_path) {

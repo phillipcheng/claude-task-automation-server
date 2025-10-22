@@ -19,7 +19,7 @@ class GitWorktreeManager:
         self.worktrees_dir = os.path.join(base_repo_path, ".claude_worktrees")
 
     def create_worktree(
-        self, task_name: str, branch_name: Optional[str] = None
+        self, task_name: str, branch_name: Optional[str] = None, base_branch: Optional[str] = None
     ) -> Tuple[bool, str, str]:
         """
         Create a git worktree for a task.
@@ -27,6 +27,7 @@ class GitWorktreeManager:
         Args:
             task_name: Name of the task (used for worktree directory name)
             branch_name: Branch to checkout (creates new branch if doesn't exist)
+            base_branch: Branch to branch off from (e.g., main, develop, master)
 
         Returns:
             Tuple of (success, worktree_path, message)
@@ -48,9 +49,12 @@ class GitWorktreeManager:
         try:
             if branch_name:
                 # Create worktree with specific branch
-                # Try to create new branch
+                # Determine the starting point for the new branch
+                start_point = base_branch if base_branch else "HEAD"
+
+                # Try to create new branch from base_branch
                 result = subprocess.run(
-                    ["git", "worktree", "add", "-b", branch_name, worktree_path],
+                    ["git", "worktree", "add", "-b", branch_name, worktree_path, start_point],
                     cwd=self.base_repo_path,
                     capture_output=True,
                     text=True,
@@ -70,15 +74,16 @@ class GitWorktreeManager:
                 if result.returncode != 0:
                     return False, "", f"Failed to create worktree: {result.stderr}"
             else:
-                # Create worktree on current branch
-                current_branch = self._get_current_branch(self.base_repo_path)
-                if not current_branch:
-                    current_branch = "main"
+                # Create worktree on current branch or base_branch
+                if not base_branch:
+                    base_branch = self._get_current_branch(self.base_repo_path)
+                    if not base_branch:
+                        base_branch = "main"
 
-                # Create new branch for this task
+                # Create new branch for this task from base_branch
                 task_branch = f"task/{safe_task_name}"
                 result = subprocess.run(
-                    ["git", "worktree", "add", "-b", task_branch, worktree_path],
+                    ["git", "worktree", "add", "-b", task_branch, worktree_path, base_branch],
                     cwd=self.base_repo_path,
                     capture_output=True,
                     text=True,
@@ -90,7 +95,7 @@ class GitWorktreeManager:
 
                 branch_name = task_branch
 
-            return True, worktree_path, f"Created worktree for branch '{branch_name}'"
+            return True, worktree_path, f"Created worktree for branch '{branch_name}' from '{base_branch or 'HEAD'}'"
 
         except subprocess.TimeoutExpired:
             return False, "", "Git worktree command timed out"

@@ -24,6 +24,7 @@ class TaskCreate(BaseModel):
     description: str
     root_folder: Optional[str] = None  # Project root folder
     branch_name: Optional[str] = None  # Git branch to work on
+    base_branch: Optional[str] = None  # Branch to branch off from (e.g., main, develop, master)
     use_worktree: bool = True  # Use git worktree for isolation (default: True)
     auto_start: bool = False  # Automatically start task execution (default: False)
     project_path: Optional[str] = None  # Deprecated, use root_folder
@@ -59,6 +60,7 @@ class TaskResponse(BaseModel):
     description: str
     root_folder: Optional[str]
     branch_name: Optional[str]
+    base_branch: Optional[str]
     git_repo: Optional[str]
     worktree_path: Optional[str]
     status: TaskStatus
@@ -79,6 +81,7 @@ class TaskStatusResponse(BaseModel):
     task_name: str
     root_folder: Optional[str]
     branch_name: Optional[str]
+    base_branch: Optional[str]
     status: TaskStatus
     summary: Optional[str]
     error_message: Optional[str]

@@ -27,6 +27,7 @@ class Task(Base):
     # Project context
     root_folder = Column(String(500), nullable=True)
     branch_name = Column(String(200), nullable=True)
+    base_branch = Column(String(200), nullable=True)  # Branch to branch off from (e.g., main, develop)
     git_repo = Column(String(500), nullable=True)
     worktree_path = Column(String(500), nullable=True)  # Git worktree path if using worktree
 
