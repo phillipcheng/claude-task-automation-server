@@ -4,6 +4,7 @@ A Python-based HTTP request/response system that automates task completion using
 
 ## Features
 
+- **Web UI**: Modern web interface for visual task management and monitoring
 - **Task Lifecycle Management**: Create, start, stop, and resume tasks with full control
 - **Git Worktree Isolation**: Parallel task execution on same project using isolated branches
 - **Intelligent Auto-Responses**: Context-aware replies to Claude's questions
@@ -85,9 +86,23 @@ Or using uvicorn directly:
 uvicorn app.main:app --reload
 ```
 
-The server will start on `http://localhost:8000`. API documentation is available at `http://localhost:8000/docs`.
+The server will start on `http://localhost:8000`.
 
-### Quick Start
+**Web UI**: Open browser to `http://localhost:8000/` for visual task management
+**API Docs**: Available at `http://localhost:8000/docs`
+
+### Quick Start (Web UI)
+
+Open your browser and navigate to `http://localhost:8000/` to access the web interface.
+
+1. Fill in the task creation form
+2. Click "Create Task" (optionally enable auto-start)
+3. Monitor task progress in real-time
+4. Use Start/Stop/Resume buttons as needed
+
+See [WEB_UI_GUIDE.md](WEB_UI_GUIDE.md) for complete web UI documentation.
+
+### Quick Start (Command Line)
 
 **1. Create a task (doesn't auto-start):**
 
@@ -389,6 +404,7 @@ python -m app.main > server.log 2>&1
 
 Comprehensive documentation is available:
 
+- **[WEB_UI_GUIDE.md](WEB_UI_GUIDE.md)** - Web interface user guide
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute setup guide
 - **[TASK_LIFECYCLE.md](TASK_LIFECYCLE.md)** - Task lifecycle management (create/start/stop/resume)
 - **[GIT_WORKTREE_GUIDE.md](GIT_WORKTREE_GUIDE.md)** - Parallel task execution with git worktrees
