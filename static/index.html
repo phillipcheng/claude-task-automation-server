@@ -1051,6 +1051,8 @@
                 actions = `<button onclick="stopTask('${task.task_name}')" class="btn btn-danger btn-sm">Stop</button>`;
             } else if (status.status === 'stopped') {
                 actions = `<button onclick="resumeTask('${task.task_name}')" class="btn btn-success btn-sm">Resume</button>`;
+            } else if (status.status === 'failed') {
+                actions = `<button onclick="startTask('${task.task_name}')" class="btn btn-success btn-sm">Retry</button>`;
             }
             actions += `<button onclick="viewConversation('${task.task_name}')" class="btn btn-sm">💬 View Conversation</button>`;
             actions += `<button onclick="deleteTask('${task.task_name}')" class="btn btn-danger btn-sm">Delete</button>`;
