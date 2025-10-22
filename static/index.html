@@ -582,6 +582,20 @@
                             🔄 Load Branches
                         </button>
                     </label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                        <label style="font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 4px;">
+                            <input type="radio" name="branchType" value="local" checked onchange="loadGitBranches()">
+                            Local
+                        </label>
+                        <label style="font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 4px;">
+                            <input type="radio" name="branchType" value="remote" onchange="loadGitBranches()">
+                            Remote
+                        </label>
+                        <label style="font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 4px;">
+                            <input type="radio" name="branchType" value="all" onchange="loadGitBranches()">
+                            All
+                        </label>
+                    </div>
                     <select id="baseBranch">
                         <option value="">Auto-detect current branch</option>
                     </select>
@@ -903,8 +917,12 @@
                 return;
             }
 
+            // Get selected branch type (default to "local")
+            const branchTypeRadio = document.querySelector('input[name="branchType"]:checked');
+            const branchType = branchTypeRadio ? branchTypeRadio.value : 'local';
+
             try {
-                const response = await fetch(`${API_BASE}/git-branches?path=${encodeURIComponent(rootFolder)}`);
+                const response = await fetch(`${API_BASE}/git-branches?path=${encodeURIComponent(rootFolder)}&branch_type=${branchType}`);
 
                 if (!response.ok) {
                     const error = await response.json();

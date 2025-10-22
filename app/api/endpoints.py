@@ -529,6 +529,108 @@ async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db:
     return response
 
 
+@router.get("/git-branches")
+async def list_git_branches(path: str, branch_type: str = "local"):
+    """
+    List git branches from a repository.
+
+    Args:
+        path: Path to the git repository
+        branch_type: Type of branches to list - "local", "remote", or "all" (default: "local")
+
+    Returns:
+        List of branch names and current branch
+    """
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=400, detail="Invalid repository path")
+
+    if not os.path.isdir(path):
+        raise HTTPException(status_code=400, detail="Path is not a directory")
+
+    # Check if it's a git repository
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=400, detail="Not a git repository")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Not a git repository: {str(e)}")
+
+    try:
+        # Get current branch
+        current_result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        current_branch = current_result.stdout.strip() if current_result.returncode == 0 else None
+
+        # Get branches based on type
+        if branch_type == "local":
+            git_command = ["git", "branch"]
+        elif branch_type == "remote":
+            git_command = ["git", "branch", "-r"]
+        else:  # "all"
+            git_command = ["git", "branch", "-a"]
+
+        branches_result = subprocess.run(
+            git_command,
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if branches_result.returncode != 0:
+            raise HTTPException(status_code=500, detail="Failed to list branches")
+
+        # Parse branch names
+        branches = []
+        for line in branches_result.stdout.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            # Remove the * marker for current branch
+            if line.startswith('*'):
+                line = line[1:].strip()
+
+            # Skip HEAD references
+            if '-> ' in line or line.startswith('remotes/origin/HEAD') or line.startswith('origin/HEAD'):
+                continue
+
+            # Clean up branch names based on type
+            if branch_type == "remote" or branch_type == "all":
+                if line.startswith('remotes/origin/'):
+                    branch_name = line.replace('remotes/origin/', '')
+                elif line.startswith('origin/'):
+                    branch_name = line.replace('origin/', '')
+                else:
+                    branch_name = line
+            else:
+                branch_name = line
+
+            if branch_name and branch_name not in branches:
+                branches.append(branch_name)
+
+        return {
+            "current_branch": current_branch,
+            "branches": sorted(branches)
+        }
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="Git command timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Legacy endpoints (for backward compatibility)
 
 @router.post("/sessions", response_model=SessionResponse)
