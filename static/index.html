@@ -576,10 +576,17 @@
                     <input type="text" id="branchName" placeholder="Leave empty for auto-generation">
                 </div>
                 <div class="form-group">
-                    <label for="baseBranch">Base Branch (optional)</label>
-                    <input type="text" id="baseBranch" placeholder="e.g., main, develop, master (auto-detected if empty)">
+                    <label for="baseBranch">
+                        Base Branch (optional)
+                        <button type="button" onclick="loadGitBranches()" class="btn btn-sm" style="float: right;" title="Load branches from project">
+                            🔄 Load Branches
+                        </button>
+                    </label>
+                    <select id="baseBranch">
+                        <option value="">Auto-detect current branch</option>
+                    </select>
                     <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">
-                        Branch to branch off from when creating the new task branch
+                        Branch to branch off from when creating the new task branch. Click "Load Branches" to see available branches from your project.
                     </small>
                 </div>
                 <div class="form-group checkbox-group">
@@ -873,6 +880,11 @@
                 document.getElementById('rootFolder').value = currentBrowsePath;
                 localStorage.setItem('lastRootFolder', currentBrowsePath);
                 closeDirectoryModal();
+
+                // Auto-load git branches if it's a git repository
+                loadGitBranches().catch(() => {
+                    // Silently fail if not a git repo
+                });
             }
         }
 
@@ -880,6 +892,43 @@
         function closeDirectoryModal() {
             document.getElementById('directoryModal').classList.remove('show');
             currentBrowsePath = null;
+        }
+
+        // Load git branches from project
+        async function loadGitBranches() {
+            const rootFolder = document.getElementById('rootFolder').value.trim();
+
+            if (!rootFolder) {
+                alert('Please select a project root folder first');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/git-branches?path=${encodeURIComponent(rootFolder)}`);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to load branches');
+                }
+
+                const data = await response.json();
+
+                const select = document.getElementById('baseBranch');
+                select.innerHTML = '<option value="">Auto-detect current branch</option>';
+
+                data.branches.forEach(branch => {
+                    const option = document.createElement('option');
+                    option.value = branch;
+                    option.textContent = branch;
+                    if (branch === data.current_branch) {
+                        option.textContent += ' (current)';
+                    }
+                    select.appendChild(option);
+                });
+
+            } catch (error) {
+                alert(`Error loading branches: ${error.message}`);
+            }
         }
 
         // Close modal when clicking outside
