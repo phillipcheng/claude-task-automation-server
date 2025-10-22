@@ -14,6 +14,7 @@ from app.models import (
 )
 from app.services.claude_cli_client import ClaudeCLIClient
 from app.services.simulated_human import SimulatedHuman
+from app.services.intelligent_responder import IntelligentResponder
 from app.services.test_runner import TestRunner
 from datetime import datetime
 import re
@@ -28,6 +29,7 @@ class TaskExecutor:
         cli_cmd = cli_command or os.getenv("CLAUDE_CLI_COMMAND", "claude")
         self.claude_client = ClaudeCLIClient(cli_command=cli_cmd)
         self.simulated_human = SimulatedHuman()
+        self.intelligent_responder = IntelligentResponder()
         self.test_runner = TestRunner()
         self.max_iterations = 20
         self.max_pauses = 5
@@ -106,6 +108,8 @@ Start implementing now."""
             db, task.id, InteractionType.USER_REQUEST, initial_message
         )
 
+        last_response = ""
+
         while iteration < self.max_iterations:
             iteration += 1
 
@@ -115,36 +119,39 @@ Start implementing now."""
                     message_to_send = initial_message
                     is_first_message = False
                 else:
-                    # For continuation, we'll send a simulated human prompt
-                    has_error = False  # We'll detect this from previous response if stored
+                    # Check if we should continue based on last response
+                    if not self.intelligent_responder.should_continue_conversation(
+                        last_response, iteration, self.max_iterations
+                    ):
+                        break
 
-                    if self.simulated_human.should_intervene(iteration, has_error):
-                        if pause_count < self.max_pauses:
-                            task.status = TaskStatus.PAUSED
-                            db.commit()
+                    # Use intelligent responder to generate context-aware reply
+                    if pause_count < self.max_pauses:
+                        task.status = TaskStatus.PAUSED
+                        db.commit()
 
-                            # Wait a bit to simulate human thinking
-                            await asyncio.sleep(1)
+                        # Wait a bit to simulate human thinking
+                        await asyncio.sleep(1)
 
-                            # Get simulated human response
-                            intervention_type = self.simulated_human.get_intervention_type(has_error)
-                            human_prompt = self.simulated_human.get_continuation_prompt(intervention_type)
+                        # Generate intelligent response based on Claude's output
+                        human_prompt = self.intelligent_responder.generate_response(
+                            claude_response=last_response,
+                            task_description=task.description,
+                            iteration=iteration
+                        )
 
-                            message_to_send = human_prompt
+                        message_to_send = human_prompt
 
-                            # Save simulated human interaction
-                            self._save_interaction(
-                                db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt
-                            )
+                        # Save simulated human interaction
+                        self._save_interaction(
+                            db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt
+                        )
 
-                            task.status = TaskStatus.RUNNING
-                            db.commit()
-                            pause_count += 1
-                        else:
-                            # Max pauses reached, stop
-                            break
+                        task.status = TaskStatus.RUNNING
+                        db.commit()
+                        pause_count += 1
                     else:
-                        # No intervention needed, break the loop
+                        # Max pauses reached, stop
                         break
 
                 # Get Claude's response via CLI
@@ -158,6 +165,9 @@ Start implementing now."""
                 self._save_interaction(
                     db, task.id, InteractionType.CLAUDE_RESPONSE, response
                 )
+
+                # Store for next iteration
+                last_response = response
 
                 # Check if task seems complete
                 if self._is_task_complete(response):
