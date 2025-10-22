@@ -544,6 +544,7 @@ async def clone_task(task_name: str, db: Session = Depends(get_db)):
     # Create new task with same parameters
     new_task = Task(
         task_name=new_task_name,
+        session_id=original_task.session_id,  # Copy session_id from original
         description=original_task.description,
         root_folder=original_task.root_folder,
         branch_name=None,  # Will be auto-generated
