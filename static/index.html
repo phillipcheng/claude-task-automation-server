@@ -1341,9 +1341,17 @@
                 const prompt = allPrompts.find(p => p.id === promptId);
                 if (!prompt) return;
 
-                // Load into target field
+                // Append to target field (don't replace)
                 if (currentTargetField) {
-                    document.getElementById(currentTargetField).value = prompt.content;
+                    const field = document.getElementById(currentTargetField);
+                    const currentContent = field.value.trim();
+
+                    // Add prompt content with proper spacing
+                    if (currentContent) {
+                        field.value = currentContent + '\n\n' + prompt.content;
+                    } else {
+                        field.value = prompt.content;
+                    }
                 }
 
                 closePromptLibrary();
