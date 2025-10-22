@@ -282,6 +282,7 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
         task_name=task.task_name,
         root_folder=task.root_folder,
         branch_name=task.branch_name,
+        base_branch=task.base_branch,
         status=task.status,
         summary=task.summary,
         error_message=task.error_message,
@@ -596,6 +597,7 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
         task_name=task.task_name,
         root_folder=task.root_folder,
         branch_name=task.branch_name,
+        base_branch=task.base_branch,
         status=task.status,
         summary=task.summary,
         error_message=task.error_message,
@@ -674,8 +676,9 @@ async def list_prompts(
             (Prompt.tags.like(search_term))
         )
 
-    prompts = query.order_by(Prompt.last_used_at.desc().nullsfirst(),
-                             Prompt.usage_count.desc()).limit(limit).all()
+    # Order by usage: NULL last_used_at values will naturally go to the end in MySQL
+    prompts = query.order_by(Prompt.usage_count.desc(),
+                             Prompt.last_used_at.desc()).limit(limit).all()
 
     return prompts
 
