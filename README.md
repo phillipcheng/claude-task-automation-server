@@ -4,6 +4,7 @@ A Python-based HTTP request/response system that automates task completion using
 
 ## Features
 
+- **Human-in-the-Loop**: View conversations, monitor Claude's work, and provide custom input when needed
 - **Web UI**: Modern web interface for visual task management and monitoring
 - **Task Lifecycle Management**: Create, start, stop, and resume tasks with full control
 - **Git Worktree Isolation**: Parallel task execution on same project using isolated branches
@@ -404,6 +405,7 @@ python -m app.main > server.log 2>&1
 
 Comprehensive documentation is available in the [`docs/`](docs/) folder:
 
+- **[HUMAN_IN_THE_LOOP.md](docs/HUMAN_IN_THE_LOOP.md)** - Monitor and control Claude with custom input ⭐ NEW
 - **[WEB_UI_GUIDE.md](docs/WEB_UI_GUIDE.md)** - Web interface user guide
 - **[QUICKSTART.md](docs/QUICKSTART.md)** - 5-minute setup guide
 - **[TASK_LIFECYCLE.md](docs/TASK_LIFECYCLE.md)** - Task lifecycle management (create/start/stop/resume)
