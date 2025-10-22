@@ -134,9 +134,39 @@ async def create_task(
 
     if root_folder and os.path.exists(root_folder):
         detected_branch, detected_repo = get_git_info(root_folder)
-        if not branch_name:
-            branch_name = detected_branch
         git_repo = detected_repo
+
+        # For git repos, validate branch requirements
+        if git_repo:
+            # Check if other tasks exist on same root_folder
+            existing_tasks = db.query(Task).filter(
+                Task.root_folder == root_folder,
+                Task.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.PAUSED])
+            ).all()
+
+            # If branch_name not specified, auto-generate unique branch
+            if not branch_name:
+                # Create unique branch name for this task
+                branch_name = f"task/{task_data.task_name.replace('/', '_').replace(' ', '_')}"
+
+            # Validate branch uniqueness if multiple tasks on same project
+            if existing_tasks:
+                # Check if branch is already used by another active task
+                used_branches = [t.branch_name for t in existing_tasks if t.branch_name]
+                if branch_name in used_branches:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Branch '{branch_name}' is already being used by another active task on this project. "
+                               f"Please specify a different branch_name or wait for the other task to complete."
+                    )
+
+                # Enforce worktree usage for parallel tasks
+                if not task_data.use_worktree:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Multiple tasks detected on project '{root_folder}'. "
+                               f"You must use worktrees (use_worktree=true) for parallel task execution."
+                    )
 
         # Use git worktree if enabled and it's a git repo
         if task_data.use_worktree and git_repo:
@@ -152,12 +182,21 @@ async def create_task(
                 if success:
                     worktree_path = wt_path
                     actual_working_dir = wt_path
-                    # If branch was auto-created, update branch_name
-                    if not task_data.branch_name and "task/" in message:
-                        branch_name = f"task/{task_data.task_name.replace('/', '_').replace(' ', '_')}"
                 else:
-                    # Log warning but continue without worktree
-                    print(f"Warning: Could not create worktree: {message}")
+                    # Worktree creation failed - this is critical for parallel tasks
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to create worktree: {message}. Cannot proceed with task creation."
+                    )
+            else:
+                # Git worktree not supported
+                raise HTTPException(
+                    status_code=400,
+                    detail="Git worktree is not supported (requires git 2.5+). Please upgrade git or disable worktree usage."
+                )
+        elif not branch_name:
+            # Not using worktree, fall back to detected branch
+            branch_name = detected_branch
 
     # Create task
     db_task = Task(
