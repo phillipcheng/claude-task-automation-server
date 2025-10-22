@@ -442,6 +442,55 @@ async def set_custom_human_input(
     }
 
 
+@router.get("/browse-directories")
+async def browse_directories(path: str = None):
+    """Browse directories on the server filesystem."""
+    import os
+    from pathlib import Path
+
+    # Start from home directory if no path provided
+    if not path:
+        path = str(Path.home())
+
+    # Security: ensure path exists and is a directory
+    if not os.path.exists(path) or not os.path.isdir(path):
+        raise HTTPException(status_code=400, detail="Invalid directory path")
+
+    try:
+        # Get parent directory
+        parent = str(Path(path).parent) if path != "/" else None
+
+        # List directories only (not files)
+        items = []
+        for item in sorted(os.listdir(path)):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path) and not item.startswith('.'):
+                try:
+                    # Check if readable
+                    os.listdir(item_path)
+                    items.append({
+                        "name": item,
+                        "path": item_path,
+                        "accessible": True
+                    })
+                except PermissionError:
+                    items.append({
+                        "name": item,
+                        "path": item_path,
+                        "accessible": False
+                    })
+
+        return {
+            "current_path": path,
+            "parent_path": parent,
+            "directories": items
+        }
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/tasks/by-name/{task_name}")
 async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db: Session = Depends(get_db)):
     """Delete a task by name and optionally cleanup its worktree."""

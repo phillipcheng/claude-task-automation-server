@@ -416,6 +416,58 @@
             outline: none;
             border-color: #667eea;
         }
+
+        /* Directory Browser */
+        .dir-browser {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .dir-path {
+            background: #f3f4f6;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 13px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dir-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .dir-item {
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .dir-item:hover {
+            background: #f9fafb;
+        }
+
+        .dir-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .dir-item.disabled:hover {
+            background: transparent;
+        }
+
+        .dir-icon {
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -444,9 +496,6 @@
                         <input type="text" id="rootFolder" placeholder="/path/to/your/project" required style="flex: 1;">
                         <button type="button" onclick="selectDirectory()" class="btn btn-sm" title="Browse for directory">📁 Browse</button>
                     </div>
-                    <small style="color: #6b7280; font-size: 12px; margin-top: 5px; display: block;">
-                        Browse button works in Chrome/Edge. Other browsers: type path manually.
-                    </small>
                 </div>
                 <div class="form-group">
                     <label for="branchName">Branch Name (optional)</label>
@@ -475,6 +524,31 @@
             </div>
             <div id="tasksList" class="tasks-list">
                 <div class="loading">Loading tasks...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Directory Browser Modal -->
+    <div id="directoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📁 Browse Directories</h2>
+                <button class="modal-close" onclick="closeDirectoryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="dir-browser">
+                    <div class="dir-path">
+                        <span id="currentPath" style="flex: 1;"></span>
+                        <button onclick="goToParent()" class="btn btn-sm" id="parentBtn">⬆️ Up</button>
+                    </div>
+                    <ul class="dir-list" id="dirList">
+                        <li class="loading" style="padding: 20px; text-align: center;">Loading...</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="selectCurrentDirectory()" class="btn btn-success btn-sm">✓ Select This Folder</button>
+                <button onclick="closeDirectoryModal()" class="btn btn-sm">Cancel</button>
             </div>
         </div>
     </div>
@@ -519,33 +593,93 @@
             }
         });
 
-        // Directory picker (works in Chrome/Edge)
-        async function selectDirectory() {
-            try {
-                // Check if the File System Access API is supported
-                if ('showDirectoryPicker' in window) {
-                    const dirHandle = await window.showDirectoryPicker();
-                    // Get the full path if available, otherwise use the name
-                    const rootFolder = dirHandle.name;
+        // Directory browser state
+        let currentBrowsePath = null;
 
-                    // Try to get full path (not always available due to security)
-                    try {
-                        // This is a workaround - we'll show the directory name
-                        // and let the user complete the path
-                        alert(`Selected: ${rootFolder}\n\nNote: For security reasons, browsers don't provide the full path.\nPlease complete the full path in the text field.`);
-                        document.getElementById('rootFolder').focus();
-                    } catch (e) {
-                        document.getElementById('rootFolder').value = rootFolder;
-                    }
+        // Open directory browser
+        async function selectDirectory() {
+            document.getElementById('directoryModal').classList.add('show');
+            await loadDirectories();
+        }
+
+        // Load directories from server
+        async function loadDirectories(path = null) {
+            const dirList = document.getElementById('dirList');
+            const currentPathSpan = document.getElementById('currentPath');
+            const parentBtn = document.getElementById('parentBtn');
+
+            dirList.innerHTML = '<li class="loading" style="padding: 20px; text-align: center;">Loading...</li>';
+
+            try {
+                const url = path ?
+                    `${API_BASE}/browse-directories?path=${encodeURIComponent(path)}` :
+                    `${API_BASE}/browse-directories`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                currentBrowsePath = data.current_path;
+                currentPathSpan.textContent = data.current_path;
+
+                // Enable/disable parent button
+                parentBtn.disabled = !data.parent_path;
+
+                // Render directories
+                if (data.directories.length === 0) {
+                    dirList.innerHTML = '<li style="padding: 20px; text-align: center; color: #6b7280;">No subdirectories</li>';
                 } else {
-                    alert('Directory picker is not supported in this browser.\n\nPlease use Chrome or Edge, or type the path manually.');
+                    dirList.innerHTML = data.directories.map(dir => `
+                        <li class="dir-item ${dir.accessible ? '' : 'disabled'}"
+                            onclick="${dir.accessible ? `navigateToDirectory('${dir.path.replace(/'/g, "\\'")}')` : ''}">
+                            <span class="dir-icon">${dir.accessible ? '📁' : '🔒'}</span>
+                            <span>${dir.name}</span>
+                        </li>
+                    `).join('');
                 }
             } catch (error) {
-                if (error.name !== 'AbortError') {
-                    console.error('Error selecting directory:', error);
-                }
+                dirList.innerHTML = `<li style="padding: 20px; color: #ef4444;">Error: ${error.message}</li>`;
             }
         }
+
+        // Navigate to a directory
+        async function navigateToDirectory(path) {
+            await loadDirectories(path);
+        }
+
+        // Go to parent directory
+        async function goToParent() {
+            const currentPathSpan = document.getElementById('currentPath');
+            const currentPath = currentPathSpan.textContent;
+
+            // Get parent path
+            const pathParts = currentPath.split('/');
+            pathParts.pop();
+            const parentPath = pathParts.join('/') || '/';
+
+            await loadDirectories(parentPath);
+        }
+
+        // Select current directory
+        function selectCurrentDirectory() {
+            if (currentBrowsePath) {
+                document.getElementById('rootFolder').value = currentBrowsePath;
+                localStorage.setItem('lastRootFolder', currentBrowsePath);
+                closeDirectoryModal();
+            }
+        }
+
+        // Close directory modal
+        function closeDirectoryModal() {
+            document.getElementById('directoryModal').classList.remove('show');
+            currentBrowsePath = null;
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('directoryModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDirectoryModal();
+            }
+        });
 
         // Create task
         document.getElementById('createTaskForm').addEventListener('submit', async (e) => {
