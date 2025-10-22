@@ -1055,6 +1055,7 @@
                 actions = `<button onclick="startTask('${task.task_name}')" class="btn btn-success btn-sm">Retry</button>`;
             }
             actions += `<button onclick="viewConversation('${task.task_name}')" class="btn btn-sm">💬 View Conversation</button>`;
+            actions += `<button onclick="cloneTask('${task.task_name}')" class="btn btn-sm">📋 Clone</button>`;
             actions += `<button onclick="deleteTask('${task.task_name}')" class="btn btn-danger btn-sm">Delete</button>`;
 
             let claudeResponse = '';
@@ -1168,6 +1169,26 @@
                 loadTasks();
             } catch (error) {
                 alert(`Error deleting task: ${error.message}`);
+            }
+        }
+
+        // Clone task
+        async function cloneTask(taskName) {
+            try {
+                const response = await fetch(`${API_BASE}/tasks/by-name/${taskName}/clone`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to clone task');
+                }
+
+                const result = await response.json();
+                alert(`Task cloned successfully!\nNew task: ${result.new_task}`);
+                loadTasks();
+            } catch (error) {
+                alert(`Error cloning task: ${error.message}`);
             }
         }
 

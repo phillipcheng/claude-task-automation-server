@@ -529,6 +529,56 @@ async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db:
     return response
 
 
+@router.post("/tasks/by-name/{task_name}/clone")
+async def clone_task(task_name: str, db: Session = Depends(get_db)):
+    """Clone an existing task with a new name, preserving all parameters."""
+    # Find the original task
+    original_task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not original_task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    # Generate new task name
+    import time
+    new_task_name = f"{task_name}_clone_{int(time.time())}"
+
+    # Create new task with same parameters
+    new_task = Task(
+        task_name=new_task_name,
+        description=original_task.description,
+        root_folder=original_task.root_folder,
+        branch_name=None,  # Will be auto-generated
+        base_branch=original_task.base_branch,
+        status=TaskStatus.PENDING,
+        summary=None,
+        error_message=None,
+        worktree_path=None,
+        custom_human_input=None,
+    )
+
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+
+    return {
+        "message": f"Task cloned successfully",
+        "original_task": task_name,
+        "new_task": new_task_name,
+        "task": TaskResponse(
+            id=new_task.id,
+            task_name=new_task.task_name,
+            description=new_task.description,
+            root_folder=new_task.root_folder,
+            branch_name=new_task.branch_name,
+            base_branch=new_task.base_branch,
+            status=new_task.status,
+            summary=new_task.summary,
+            error_message=new_task.error_message,
+            created_at=new_task.created_at,
+            updated_at=new_task.updated_at,
+        )
+    }
+
+
 @router.get("/git-branches")
 async def list_git_branches(path: str, branch_type: str = "local"):
     """
