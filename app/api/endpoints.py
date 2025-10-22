@@ -14,6 +14,7 @@ from app.models import (
     Task,
     TaskStatus,
     TestCaseStatus,
+    InteractionType,
 )
 from app.services.task_executor import TaskExecutor
 from app.services.git_worktree import GitWorktreeManager
@@ -242,6 +243,18 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
     failed_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.FAILED])
     pending_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.PENDING])
 
+    # Get latest Claude response
+    latest_claude_response = None
+    claude_responses = [
+        i for i in task.interactions
+        if i.interaction_type == InteractionType.CLAUDE_RESPONSE
+    ]
+    if claude_responses:
+        latest_claude_response = claude_responses[-1].content
+
+    # Check if waiting for input (PAUSED status means waiting)
+    waiting_for_input = task.status == TaskStatus.PAUSED
+
     # Generate progress message
     progress_messages = {
         TaskStatus.PENDING: "Task is queued for execution",
@@ -267,6 +280,8 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
             "failed": failed_tests,
             "pending": pending_tests,
         },
+        latest_claude_response=latest_claude_response,
+        waiting_for_input=waiting_for_input,
     )
 
 
@@ -360,6 +375,18 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
     failed_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.FAILED])
     pending_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.PENDING])
 
+    # Get latest Claude response
+    latest_claude_response = None
+    claude_responses = [
+        i for i in task.interactions
+        if i.interaction_type == InteractionType.CLAUDE_RESPONSE
+    ]
+    if claude_responses:
+        latest_claude_response = claude_responses[-1].content
+
+    # Check if waiting for input (PAUSED status means waiting)
+    waiting_for_input = task.status == TaskStatus.PAUSED
+
     # Generate progress message
     progress_messages = {
         TaskStatus.PENDING: "Task is queued for execution",
@@ -385,6 +412,8 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
             "failed": failed_tests,
             "pending": pending_tests,
         },
+        latest_claude_response=latest_claude_response,
+        waiting_for_input=waiting_for_input,
     )
 
 

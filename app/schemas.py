@@ -83,6 +83,8 @@ class TaskStatusResponse(BaseModel):
     error_message: Optional[str]
     progress: str
     test_summary: dict
+    latest_claude_response: Optional[str] = None  # Latest response from Claude
+    waiting_for_input: bool = False  # Whether Claude is waiting for user input
 
     class Config:
         from_attributes = True
