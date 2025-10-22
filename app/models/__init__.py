@@ -2,6 +2,7 @@ from app.models.session import Session
 from app.models.task import Task, TaskStatus
 from app.models.test_case import TestCase, TestCaseType, TestCaseStatus
 from app.models.interaction import ClaudeInteraction, InteractionType
+from app.models.prompt import Prompt
 
 __all__ = [
     "Session",
@@ -12,4 +13,5 @@ __all__ = [
     "TestCaseStatus",
     "ClaudeInteraction",
     "InteractionType",
+    "Prompt",
 ]

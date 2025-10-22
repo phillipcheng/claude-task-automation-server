@@ -92,3 +92,33 @@ class TaskStatusResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Prompt Management Schemas
+class PromptCreate(BaseModel):
+    title: str
+    content: str
+    category: Optional[str] = None
+    tags: Optional[str] = None
+
+
+class PromptUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    category: Optional[str] = None
+    tags: Optional[str] = None
+
+
+class PromptResponse(BaseModel):
+    id: str
+    title: str
+    content: str
+    category: Optional[str]
+    tags: Optional[str]
+    usage_count: int
+    created_at: datetime
+    updated_at: datetime
+    last_used_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True

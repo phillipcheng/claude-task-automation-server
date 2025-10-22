@@ -468,6 +468,72 @@
         .dir-icon {
             font-size: 16px;
         }
+
+        /* Prompt Library Styles */
+        .prompt-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .prompt-item {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .prompt-item:hover {
+            background: #f9fafb;
+        }
+
+        .prompt-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .prompt-title {
+            font-weight: 600;
+            font-size: 15px;
+            color: #1f2937;
+        }
+
+        .prompt-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .prompt-category {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .prompt-content-preview {
+            color: #4b5563;
+            font-size: 13px;
+            max-height: 60px;
+            overflow: hidden;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .prompt-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .prompt-usage {
+            font-size: 11px;
+            color: #9ca3af;
+        }
     </style>
 </head>
 <body>
@@ -487,7 +553,15 @@
                     <input type="text" id="taskName" placeholder="e.g., add-login-feature" required>
                 </div>
                 <div class="form-group">
-                    <label for="description">Description *</label>
+                    <label for="description">
+                        Description *
+                        <button type="button" onclick="openPromptLibrary('description')" class="btn btn-sm" style="float: right; margin-left: 10px;" title="Load from prompt library">
+                            📚 Load Prompt
+                        </button>
+                        <button type="button" onclick="saveCurrentPrompt('description')" class="btn btn-sm" style="float: right;" title="Save current text as prompt">
+                            💾 Save as Prompt
+                        </button>
+                    </label>
                     <textarea id="description" placeholder="Describe what Claude should implement..." required></textarea>
                 </div>
                 <div class="form-group">
@@ -572,7 +646,14 @@
                     <div class="loading">Loading conversation...</div>
                 </div>
                 <div class="input-editor" id="inputEditor" style="display: none;">
-                    <h3>✍️ Custom Human Input</h3>
+                    <h3>✍️ Custom Human Input
+                        <button type="button" onclick="openPromptLibrary('customInput')" class="btn btn-sm" style="float: right; margin-left: 10px;" title="Load from prompt library">
+                            📚 Load Prompt
+                        </button>
+                        <button type="button" onclick="saveCurrentPrompt('customInput')" class="btn btn-sm" style="float: right;" title="Save current text as prompt">
+                            💾 Save as Prompt
+                        </button>
+                    </h3>
                     <p style="color: #6b7280; font-size: 14px; margin: 10px 0;">
                         Provide custom input for the next interaction. This will override the auto-generated response.
                     </p>
@@ -584,6 +665,126 @@
                 <button onclick="toggleInputEditor()" class="btn btn-warning btn-sm">✍️ Edit Input</button>
                 <button onclick="sendCustomInput()" class="btn btn-success btn-sm" style="display: none;" id="sendInputBtn">Send Input</button>
                 <button onclick="closeConversationModal()" class="btn btn-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt Library Modal -->
+    <div id="promptLibraryModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>📚 Prompt Library</h2>
+                <button class="modal-close" onclick="closePromptLibrary()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                    <input type="text" id="promptSearch" placeholder="Search prompts..." style="flex: 1;" onkeyup="searchPrompts()">
+                    <select id="promptCategoryFilter" onchange="filterPrompts()" style="width: 150px;">
+                        <option value="">All Categories</option>
+                        <option value="task">Task</option>
+                        <option value="bug-fix">Bug Fix</option>
+                        <option value="feature">Feature</option>
+                        <option value="refactor">Refactor</option>
+                        <option value="test">Test</option>
+                        <option value="docs">Documentation</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <button onclick="loadPrompts()" class="btn btn-sm">🔄 Refresh</button>
+                </div>
+                <div id="promptList" class="prompt-list">
+                    <div class="loading">Loading prompts...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closePromptLibrary()" class="btn btn-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Prompt Modal -->
+    <div id="savePromptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💾 Save Prompt</h2>
+                <button class="modal-close" onclick="closeSavePrompt()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="savePromptForm">
+                    <div class="form-group">
+                        <label for="promptTitle">Prompt Title *</label>
+                        <input type="text" id="promptTitle" placeholder="e.g., Add REST API endpoint" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="promptCategory">Category</label>
+                        <select id="promptCategory">
+                            <option value="">None</option>
+                            <option value="task">Task</option>
+                            <option value="bug-fix">Bug Fix</option>
+                            <option value="feature">Feature</option>
+                            <option value="refactor">Refactor</option>
+                            <option value="test">Test</option>
+                            <option value="docs">Documentation</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="promptTags">Tags (comma-separated)</label>
+                        <input type="text" id="promptTags" placeholder="e.g., api, rest, backend">
+                    </div>
+                    <div class="form-group">
+                        <label for="promptContent">Content *</label>
+                        <textarea id="promptContent" rows="10" required readonly></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="savePromptToLibrary()" class="btn btn-success btn-sm">💾 Save</button>
+                <button onclick="closeSavePrompt()" class="btn btn-sm">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Prompt Modal -->
+    <div id="editPromptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ Edit Prompt</h2>
+                <button class="modal-close" onclick="closeEditPrompt()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editPromptForm">
+                    <input type="hidden" id="editPromptId">
+                    <div class="form-group">
+                        <label for="editPromptTitle">Prompt Title *</label>
+                        <input type="text" id="editPromptTitle" placeholder="e.g., Add REST API endpoint" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPromptCategory">Category</label>
+                        <select id="editPromptCategory">
+                            <option value="">None</option>
+                            <option value="task">Task</option>
+                            <option value="bug-fix">Bug Fix</option>
+                            <option value="feature">Feature</option>
+                            <option value="refactor">Refactor</option>
+                            <option value="test">Test</option>
+                            <option value="docs">Documentation</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPromptTags">Tags (comma-separated)</label>
+                        <input type="text" id="editPromptTags" placeholder="e.g., api, rest, backend">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPromptContent">Content *</label>
+                        <textarea id="editPromptContent" rows="10" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="updatePrompt()" class="btn btn-success btn-sm">💾 Update</button>
+                <button onclick="deletePrompt()" class="btn btn-danger btn-sm">🗑️ Delete</button>
+                <button onclick="closeEditPrompt()" class="btn btn-sm">Cancel</button>
             </div>
         </div>
     </div>
@@ -1025,6 +1226,299 @@
 
         // Initial load
         loadTasks();
+
+        // ============================================================================
+        // Prompt Management Functions
+        // ============================================================================
+
+        let currentTargetField = null;  // Track which field prompts will be loaded into
+        let allPrompts = [];  // Cache all prompts for filtering
+
+        // Open prompt library modal
+        async function openPromptLibrary(targetField) {
+            currentTargetField = targetField;
+            document.getElementById('promptLibraryModal').classList.add('show');
+            await loadPrompts();
+        }
+
+        // Close prompt library
+        function closePromptLibrary() {
+            document.getElementById('promptLibraryModal').classList.remove('show');
+            currentTargetField = null;
+        }
+
+        // Load prompts from API
+        async function loadPrompts() {
+            const promptList = document.getElementById('promptList');
+            promptList.innerHTML = '<div class="loading">Loading prompts...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/prompts?limit=100`);
+                if (!response.ok) {
+                    throw new Error('Failed to load prompts');
+                }
+
+                allPrompts = await response.json();
+                renderPrompts(allPrompts);
+            } catch (error) {
+                promptList.innerHTML = `<div style="padding: 20px; color: #ef4444;">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Render prompts to the list
+        function renderPrompts(prompts) {
+            const promptList = document.getElementById('promptList');
+
+            if (prompts.length === 0) {
+                promptList.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">No prompts found. Save your first prompt!</div>';
+                return;
+            }
+
+            promptList.innerHTML = prompts.map(prompt => {
+                const contentPreview = prompt.content.length > 150 ?
+                    prompt.content.substring(0, 150) + '...' :
+                    prompt.content;
+
+                const categoryBadge = prompt.category ?
+                    `<span class="prompt-category">${prompt.category}</span>` : '';
+
+                const usageInfo = prompt.usage_count > 0 ?
+                    `<span class="prompt-usage">Used ${prompt.usage_count} times</span>` : '';
+
+                return `
+                    <div class="prompt-item">
+                        <div class="prompt-item-header">
+                            <div class="prompt-title">${prompt.title}</div>
+                            <div class="prompt-meta">
+                                ${categoryBadge}
+                                ${usageInfo}
+                            </div>
+                        </div>
+                        <div class="prompt-content-preview">${contentPreview}</div>
+                        <div class="prompt-actions">
+                            <button onclick="usePrompt('${prompt.id}')" class="btn btn-sm btn-success">✓ Use This</button>
+                            <button onclick="editPromptDialog('${prompt.id}')" class="btn btn-sm">✏️ Edit</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Search prompts
+        function searchPrompts() {
+            const searchTerm = document.getElementById('promptSearch').value.toLowerCase();
+            const category = document.getElementById('promptCategoryFilter').value;
+
+            let filtered = allPrompts;
+
+            if (searchTerm) {
+                filtered = filtered.filter(p =>
+                    p.title.toLowerCase().includes(searchTerm) ||
+                    p.content.toLowerCase().includes(searchTerm) ||
+                    (p.tags && p.tags.toLowerCase().includes(searchTerm))
+                );
+            }
+
+            if (category) {
+                filtered = filtered.filter(p => p.category === category);
+            }
+
+            renderPrompts(filtered);
+        }
+
+        // Filter prompts by category
+        function filterPrompts() {
+            searchPrompts();
+        }
+
+        // Use a prompt (load into target field)
+        async function usePrompt(promptId) {
+            try {
+                // Mark as used
+                await fetch(`${API_BASE}/prompts/${promptId}/use`, { method: 'POST' });
+
+                // Get prompt content
+                const prompt = allPrompts.find(p => p.id === promptId);
+                if (!prompt) return;
+
+                // Load into target field
+                if (currentTargetField) {
+                    document.getElementById(currentTargetField).value = prompt.content;
+                }
+
+                closePromptLibrary();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Save current prompt
+        function saveCurrentPrompt(sourceField) {
+            const content = document.getElementById(sourceField).value.trim();
+
+            if (!content) {
+                alert('No content to save');
+                return;
+            }
+
+            // Pre-fill content in save modal
+            document.getElementById('promptContent').value = content;
+            document.getElementById('promptTitle').value = '';
+            document.getElementById('promptCategory').value = '';
+            document.getElementById('promptTags').value = '';
+
+            // Open save modal
+            document.getElementById('savePromptModal').classList.add('show');
+        }
+
+        // Close save prompt modal
+        function closeSavePrompt() {
+            document.getElementById('savePromptModal').classList.remove('show');
+        }
+
+        // Save prompt to library
+        async function savePromptToLibrary() {
+            const title = document.getElementById('promptTitle').value.trim();
+            const category = document.getElementById('promptCategory').value;
+            const tags = document.getElementById('promptTags').value.trim();
+            const content = document.getElementById('promptContent').value.trim();
+
+            if (!title || !content) {
+                alert('Title and content are required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/prompts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        content,
+                        category: category || null,
+                        tags: tags || null
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save prompt');
+                }
+
+                alert('Prompt saved successfully!');
+                closeSavePrompt();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Edit prompt dialog
+        async function editPromptDialog(promptId) {
+            try {
+                const response = await fetch(`${API_BASE}/prompts/${promptId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load prompt');
+                }
+
+                const prompt = await response.json();
+
+                // Fill edit form
+                document.getElementById('editPromptId').value = prompt.id;
+                document.getElementById('editPromptTitle').value = prompt.title;
+                document.getElementById('editPromptCategory').value = prompt.category || '';
+                document.getElementById('editPromptTags').value = prompt.tags || '';
+                document.getElementById('editPromptContent').value = prompt.content;
+
+                // Close library, open edit modal
+                closePromptLibrary();
+                document.getElementById('editPromptModal').classList.add('show');
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Close edit prompt modal
+        function closeEditPrompt() {
+            document.getElementById('editPromptModal').classList.remove('show');
+        }
+
+        // Update prompt
+        async function updatePrompt() {
+            const id = document.getElementById('editPromptId').value;
+            const title = document.getElementById('editPromptTitle').value.trim();
+            const category = document.getElementById('editPromptCategory').value;
+            const tags = document.getElementById('editPromptTags').value.trim();
+            const content = document.getElementById('editPromptContent').value.trim();
+
+            if (!title || !content) {
+                alert('Title and content are required');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/prompts/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        content,
+                        category: category || null,
+                        tags: tags || null
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update prompt');
+                }
+
+                alert('Prompt updated successfully!');
+                closeEditPrompt();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Delete prompt
+        async function deletePrompt() {
+            const id = document.getElementById('editPromptId').value;
+
+            if (!confirm('Are you sure you want to delete this prompt?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/prompts/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete prompt');
+                }
+
+                alert('Prompt deleted successfully!');
+                closeEditPrompt();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Close modals when clicking outside
+        document.getElementById('promptLibraryModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePromptLibrary();
+            }
+        });
+
+        document.getElementById('savePromptModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSavePrompt();
+            }
+        });
+
+        document.getElementById('editPromptModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeEditPrompt();
+            }
+        });
     </script>
 </body>
 </html>

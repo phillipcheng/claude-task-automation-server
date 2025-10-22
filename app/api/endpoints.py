@@ -8,6 +8,9 @@ from app.schemas import (
     TaskCreate,
     TaskResponse,
     TaskStatusResponse,
+    PromptCreate,
+    PromptUpdate,
+    PromptResponse,
 )
 from app.models import (
     Session as DBSession,
@@ -617,3 +620,139 @@ async def get_session_tasks(session_id: str, db: Session = Depends(get_db)):
 
     tasks = db.query(Task).filter(Task.session_id == session_id).all()
     return tasks
+
+
+# ============================================================================
+# Prompt Management Endpoints
+# ============================================================================
+
+@router.post("/prompts", response_model=PromptResponse, status_code=201)
+async def create_prompt(prompt_data: PromptCreate, db: Session = Depends(get_db)):
+    """Create a new prompt template."""
+    from app.models.prompt import Prompt
+
+    prompt = Prompt(
+        title=prompt_data.title,
+        content=prompt_data.content,
+        category=prompt_data.category,
+        tags=prompt_data.tags,
+    )
+
+    db.add(prompt)
+    db.commit()
+    db.refresh(prompt)
+
+    return prompt
+
+
+@router.get("/prompts", response_model=List[PromptResponse])
+async def list_prompts(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    List all prompts with optional filtering.
+
+    - category: Filter by category
+    - search: Search in title, content, and tags
+    - limit: Maximum number of results (default: 50)
+    """
+    from app.models.prompt import Prompt
+
+    query = db.query(Prompt)
+
+    if category:
+        query = query.filter(Prompt.category == category)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (Prompt.title.like(search_term)) |
+            (Prompt.content.like(search_term)) |
+            (Prompt.tags.like(search_term))
+        )
+
+    prompts = query.order_by(Prompt.last_used_at.desc().nullsfirst(),
+                             Prompt.usage_count.desc()).limit(limit).all()
+
+    return prompts
+
+
+@router.get("/prompts/{prompt_id}", response_model=PromptResponse)
+async def get_prompt(prompt_id: str, db: Session = Depends(get_db)):
+    """Get a specific prompt by ID."""
+    from app.models.prompt import Prompt
+
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    return prompt
+
+
+@router.put("/prompts/{prompt_id}", response_model=PromptResponse)
+async def update_prompt(
+    prompt_id: str,
+    prompt_data: PromptUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an existing prompt."""
+    from app.models.prompt import Prompt
+    from datetime import datetime
+
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    # Update only provided fields
+    if prompt_data.title is not None:
+        prompt.title = prompt_data.title
+    if prompt_data.content is not None:
+        prompt.content = prompt_data.content
+    if prompt_data.category is not None:
+        prompt.category = prompt_data.category
+    if prompt_data.tags is not None:
+        prompt.tags = prompt_data.tags
+
+    prompt.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(prompt)
+
+    return prompt
+
+
+@router.delete("/prompts/{prompt_id}")
+async def delete_prompt(prompt_id: str, db: Session = Depends(get_db)):
+    """Delete a prompt."""
+    from app.models.prompt import Prompt
+
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    db.delete(prompt)
+    db.commit()
+
+    return {"message": f"Prompt '{prompt.title}' deleted successfully"}
+
+
+@router.post("/prompts/{prompt_id}/use")
+async def use_prompt(prompt_id: str, db: Session = Depends(get_db)):
+    """Mark a prompt as used (increments usage count and updates last_used_at)."""
+    from app.models.prompt import Prompt
+    from datetime import datetime
+
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    prompt.usage_count += 1
+    prompt.last_used_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(prompt)
+
+    return prompt
