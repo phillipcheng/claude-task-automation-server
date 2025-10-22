@@ -532,6 +532,8 @@ async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db:
 @router.post("/tasks/by-name/{task_name}/clone")
 async def clone_task(task_name: str, db: Session = Depends(get_db)):
     """Clone an existing task with a new name, preserving all parameters."""
+    from app.models.session import Session as SessionModel
+
     # Find the original task
     original_task = db.query(Task).filter(Task.task_name == task_name).first()
     if not original_task:
@@ -541,10 +543,17 @@ async def clone_task(task_name: str, db: Session = Depends(get_db)):
     import time
     new_task_name = f"{task_name}_clone_{int(time.time())}"
 
+    # Create a new session for the cloned task
+    new_session = SessionModel(
+        project_path=original_task.root_folder or ""
+    )
+    db.add(new_session)
+    db.flush()  # Get the session ID without committing
+
     # Create new task with same parameters
     new_task = Task(
         task_name=new_task_name,
-        session_id=original_task.session_id,  # Copy session_id from original
+        session_id=new_session.id,  # Use new session
         description=original_task.description,
         root_folder=original_task.root_folder,
         branch_name=None,  # Will be auto-generated
