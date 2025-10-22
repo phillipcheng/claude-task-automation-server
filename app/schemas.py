@@ -25,6 +25,7 @@ class TaskCreate(BaseModel):
     root_folder: Optional[str] = None  # Project root folder
     branch_name: Optional[str] = None  # Git branch to work on
     use_worktree: bool = True  # Use git worktree for isolation (default: True)
+    auto_start: bool = False  # Automatically start task execution (default: False)
     project_path: Optional[str] = None  # Deprecated, use root_folder
 
 

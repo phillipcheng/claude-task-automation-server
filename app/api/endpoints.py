@@ -214,9 +214,10 @@ async def create_task(
     db.commit()
     db.refresh(db_task)
 
-    # Start task execution in background
-    executor = TaskExecutor()
-    background_tasks.add_task(executor.execute_task, db_task.id)
+    # Start task execution in background only if auto_start is True
+    if task_data.auto_start:
+        executor = TaskExecutor()
+        background_tasks.add_task(executor.execute_task, db_task.id)
 
     return db_task
 
@@ -257,9 +258,10 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
 
     # Generate progress message
     progress_messages = {
-        TaskStatus.PENDING: "Task is queued for execution",
+        TaskStatus.PENDING: "Task created, waiting to be started",
         TaskStatus.RUNNING: f"Task is running - {len(task.interactions)} interactions so far",
         TaskStatus.PAUSED: "Task is paused, waiting for continuation",
+        TaskStatus.STOPPED: "Task has been stopped",
         TaskStatus.TESTING: f"Running tests: {passed_tests}/{total_tests} passed",
         TaskStatus.COMPLETED: f"Task completed successfully - all {total_tests} tests passed",
         TaskStatus.FAILED: f"Task failed - {failed_tests} tests failed",
@@ -317,6 +319,74 @@ async def list_all_tasks(
 
     tasks = query.order_by(Task.created_at.desc()).limit(limit).all()
     return tasks
+
+
+@router.post("/tasks/by-name/{task_name}/start")
+async def start_task(
+    task_name: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Start a pending task."""
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    if task.status != TaskStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task can only be started from PENDING status. Current status: {task.status}"
+        )
+
+    # Start task execution in background
+    executor = TaskExecutor()
+    background_tasks.add_task(executor.execute_task, task.id)
+
+    return {"message": f"Task '{task_name}' started", "status": "running"}
+
+
+@router.post("/tasks/by-name/{task_name}/stop")
+async def stop_task(task_name: str, db: Session = Depends(get_db)):
+    """Stop a running or paused task."""
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    if task.status not in [TaskStatus.RUNNING, TaskStatus.PAUSED, TaskStatus.TESTING]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task can only be stopped from RUNNING/PAUSED/TESTING status. Current status: {task.status}"
+        )
+
+    # Update status to STOPPED
+    task.status = TaskStatus.STOPPED
+    db.commit()
+
+    return {"message": f"Task '{task_name}' stopped", "status": "stopped"}
+
+
+@router.post("/tasks/by-name/{task_name}/resume")
+async def resume_task(
+    task_name: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Resume a stopped task."""
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    if task.status != TaskStatus.STOPPED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task can only be resumed from STOPPED status. Current status: {task.status}"
+        )
+
+    # Resume task execution in background
+    executor = TaskExecutor()
+    background_tasks.add_task(executor.execute_task, task.id)
+
+    return {"message": f"Task '{task_name}' resumed", "status": "running"}
 
 
 @router.delete("/tasks/by-name/{task_name}")
@@ -400,9 +470,10 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
 
     # Generate progress message
     progress_messages = {
-        TaskStatus.PENDING: "Task is queued for execution",
+        TaskStatus.PENDING: "Task created, waiting to be started",
         TaskStatus.RUNNING: f"Task is running - {len(task.interactions)} interactions so far",
         TaskStatus.PAUSED: "Task is paused, waiting for continuation",
+        TaskStatus.STOPPED: "Task has been stopped",
         TaskStatus.TESTING: f"Running tests: {passed_tests}/{total_tests} passed",
         TaskStatus.COMPLETED: f"Task completed successfully - all {total_tests} tests passed",
         TaskStatus.FAILED: f"Task failed - {failed_tests} tests failed",

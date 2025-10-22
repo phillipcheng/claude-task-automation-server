@@ -47,7 +47,7 @@ class TaskExecutor:
             if not task:
                 return
 
-            # Update task status
+            # Update task status (only if not stopped)
             task.status = TaskStatus.RUNNING
             db.commit()
 
@@ -112,6 +112,11 @@ Start implementing now."""
 
         while iteration < self.max_iterations:
             iteration += 1
+
+            # Check if task was stopped
+            db.refresh(task)
+            if task.status == TaskStatus.STOPPED:
+                break
 
             try:
                 # Send message to Claude CLI

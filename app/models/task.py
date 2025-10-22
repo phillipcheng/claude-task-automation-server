@@ -10,6 +10,7 @@ class TaskStatus(str, enum.Enum):
     PENDING = "pending"
     RUNNING = "running"
     PAUSED = "paused"
+    STOPPED = "stopped"
     TESTING = "testing"
     COMPLETED = "completed"
     FAILED = "failed"
