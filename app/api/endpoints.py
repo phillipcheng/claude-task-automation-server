@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
+import asyncio
+import json
 from app.database import get_db
 from app.schemas import (
     SessionCreate,
@@ -21,6 +24,7 @@ from app.models import (
 )
 from app.services.task_executor import TaskExecutor
 from app.services.git_worktree import GitWorktreeManager
+from app.services.criteria_analyzer import CriteriaAnalyzer
 import os
 import subprocess
 
@@ -177,8 +181,62 @@ async def create_task(
                                f"You must use worktrees (use_worktree=true) for parallel task execution."
                     )
 
-        # Use git worktree if enabled and it's a git repo
-        if task_data.use_worktree and git_repo:
+        # Handle multi-project setup or single project worktree
+        worktree_paths = {}  # Store worktree paths for each project
+
+        if task_data.projects:
+            # Multi-project mode: create worktrees for all projects with "write" access
+            if not task_data.use_worktree:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Multi-project tasks require worktrees (use_worktree=true) for isolation."
+                )
+
+            for project in task_data.projects:
+                project_path = project.get("path")
+                access = project.get("access", "write")
+                project_branch = project.get("branch_name") or branch_name
+
+                if not project_path or not os.path.exists(project_path):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Project path '{project_path}' does not exist."
+                    )
+
+                # Only create worktrees for projects with write access
+                if access == "write":
+                    # Check if it's a git repo
+                    _, project_git_repo = get_git_info(project_path)
+                    if project_git_repo:
+                        if not GitWorktreeManager.is_worktree_supported(project_path):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Git worktree is not supported for project '{project_path}' (requires git 2.5+)."
+                            )
+
+                        worktree_manager = GitWorktreeManager(project_path)
+                        success, wt_path, message = worktree_manager.create_worktree(
+                            task_data.task_name,
+                            project_branch,
+                            base_branch
+                        )
+
+                        if success:
+                            worktree_paths[project_path] = wt_path
+                        else:
+                            raise HTTPException(
+                                status_code=500,
+                                detail=f"Failed to create worktree for project '{project_path}': {message}"
+                            )
+
+            # For multi-project mode, use the first write project as the main worktree
+            main_project = next((p for p in task_data.projects if p.get("access", "write") == "write"), None)
+            if main_project:
+                worktree_path = worktree_paths.get(main_project["path"])
+                actual_working_dir = worktree_path or main_project["path"]
+
+        elif task_data.use_worktree and git_repo:
+            # Single project mode: original logic
             worktree_manager = GitWorktreeManager(root_folder)
 
             # Check if git worktree is supported
@@ -208,6 +266,41 @@ async def create_task(
             # Not using worktree, fall back to detected branch
             branch_name = detected_branch
 
+    # Extract or use provided ending criteria
+    end_criteria_text = task_data.end_criteria
+    criteria_warning = None
+
+    if not end_criteria_text:
+        # Try to extract ending criteria from task description using LLM
+        # Skip extraction to avoid blocking task creation - can be slow
+        # Users should provide explicit criteria for best results
+        criteria_warning = "INFO: No ending criteria provided. Task will use default completion detection (max iterations: 20)."
+
+        # Optionally enable LLM extraction (disabled by default for performance)
+        # try:
+        #     analyzer = CriteriaAnalyzer()
+        #     extracted_criteria, is_clear = await analyzer.extract_ending_criteria(task_data.description)
+        #     if is_clear and extracted_criteria:
+        #         end_criteria_text = extracted_criteria
+        # except Exception as e:
+        #     print(f"Failed to extract ending criteria: {e}")
+
+    # Build end criteria configuration JSON
+    end_criteria_config = None
+    if end_criteria_text or task_data.max_iterations or task_data.max_tokens:
+        end_criteria_config = {}
+        if end_criteria_text:
+            end_criteria_config["criteria"] = end_criteria_text
+        if task_data.max_iterations is not None:
+            end_criteria_config["max_iterations"] = task_data.max_iterations
+        else:
+            # Default max iterations
+            end_criteria_config["max_iterations"] = 20
+        if task_data.max_tokens is not None:
+            end_criteria_config["max_tokens"] = task_data.max_tokens
+        if criteria_warning:
+            end_criteria_config["warning"] = criteria_warning
+
     # Create task
     db_task = Task(
         task_name=task_data.task_name,
@@ -219,6 +312,9 @@ async def create_task(
         git_repo=git_repo,
         worktree_path=worktree_path,
         status=TaskStatus.PENDING,
+        end_criteria_config=end_criteria_config,
+        project_context=task_data.project_context,
+        projects=task_data.projects,
     )
     db.add(db_task)
     db.commit()
@@ -244,7 +340,10 @@ async def get_task_by_name(task_name: str, db: Session = Depends(get_db)):
 @router.get("/tasks/by-name/{task_name}/status", response_model=TaskStatusResponse)
 async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db)):
     """Get task status by task name."""
-    task = db.query(Task).filter(Task.task_name == task_name).first()
+    task = db.query(Task).options(
+        joinedload(Task.test_cases),
+        joinedload(Task.interactions)
+    ).filter(Task.task_name == task_name).first()
     if not task:
         raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
 
@@ -253,6 +352,12 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
     passed_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.PASSED])
     failed_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.FAILED])
     pending_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.PENDING])
+
+    # Calculate interaction count (Claude responses)
+    interaction_count = len([
+        i for i in task.interactions
+        if i.interaction_type == InteractionType.CLAUDE_RESPONSE
+    ])
 
     # Get latest Claude response
     latest_claude_response = None
@@ -265,6 +370,20 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
 
     # Check if waiting for input (PAUSED status means waiting)
     waiting_for_input = task.status == TaskStatus.PAUSED
+
+    # Check if there's an active process running
+    process_running = False
+    if task.process_pid:
+        try:
+            import os
+            os.kill(task.process_pid, 0)  # Signal 0 checks if process exists
+            process_running = True
+        except (OSError, ProcessLookupError):
+            # Process not found or we don't have permission - it's not running
+            # Clear the stale PID from the database
+            task.process_pid = None
+            db.commit()
+            process_running = False
 
     # Generate progress message
     progress_messages = {
@@ -295,6 +414,13 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
         },
         latest_claude_response=latest_claude_response,
         waiting_for_input=waiting_for_input,
+        projects=task.projects,
+        project_context=task.project_context,
+        end_criteria_config=task.end_criteria_config,
+        total_tokens_used=task.total_tokens_used,
+        interaction_count=interaction_count,
+        process_running=process_running,
+        process_pid=task.process_pid,
     )
 
 
@@ -358,7 +484,12 @@ async def start_task(
 
 @router.post("/tasks/by-name/{task_name}/stop")
 async def stop_task(task_name: str, db: Session = Depends(get_db)):
-    """Stop a running or paused task."""
+    """Stop a running or paused task and force-kill its subprocess immediately."""
+    import os
+    import signal
+    import time
+    import asyncio
+
     task = db.query(Task).filter(Task.task_name == task_name).first()
     if not task:
         raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
@@ -369,11 +500,125 @@ async def stop_task(task_name: str, db: Session = Depends(get_db)):
             detail=f"Task can only be stopped from RUNNING/PAUSED/TESTING status. Current status: {task.status}"
         )
 
-    # Update status to STOPPED
+    # Force-kill the subprocess immediately if PID is available
+    killed_process = False
+    termination_method = "none"
+
+    if task.process_pid:
+        try:
+            # First check if process exists
+            try:
+                os.kill(task.process_pid, 0)  # Signal 0 checks if process exists
+                process_exists = True
+            except ProcessLookupError:
+                process_exists = False
+
+            if process_exists:
+                # Try SIGTERM first for graceful shutdown
+                try:
+                    os.kill(task.process_pid, signal.SIGTERM)
+                    termination_method = "SIGTERM"
+
+                    # Wait briefly for graceful shutdown
+                    for _ in range(5):  # Wait up to 0.5 seconds
+                        try:
+                            os.kill(task.process_pid, 0)  # Check if still exists
+                            await asyncio.sleep(0.1)
+                        except ProcessLookupError:
+                            # Process terminated gracefully
+                            killed_process = True
+                            break
+
+                    # If still exists, force kill with SIGKILL
+                    if not killed_process:
+                        try:
+                            os.kill(task.process_pid, signal.SIGKILL)
+                            termination_method = "SIGKILL"
+                            killed_process = True
+
+                            # Give SIGKILL a moment to take effect
+                            await asyncio.sleep(0.1)
+                        except ProcessLookupError:
+                            killed_process = True  # Process already gone
+
+                except ProcessLookupError:
+                    # Process already terminated during SIGTERM
+                    killed_process = True
+
+            else:
+                # Process already terminated
+                killed_process = True
+                termination_method = "already_gone"
+
+        except Exception as e:
+            # Log error but continue with status update
+            print(f"Error killing process {task.process_pid}: {e}")
+            termination_method = f"error: {str(e)}"
+
+    # Cleanup multi-project worktrees if needed
+    cleanup_messages = []
+
+    # Check if this is a multi-project task
+    if task.projects:
+        try:
+            import json
+            from app.services.git_worktree import GitWorktreeManager
+
+            # Parse projects from JSON if needed
+            projects = task.projects if isinstance(task.projects, list) else json.loads(task.projects)
+
+            # Use the main project (task.root_folder) as the base for multi-project operations
+            if task.root_folder:
+                git_manager = GitWorktreeManager(task.root_folder)
+
+                # Clean up multi-project worktrees
+                cleanup_success, cleanup_msg = git_manager.cleanup_multi_project_worktrees(
+                    task.task_name, projects, force=True
+                )
+
+                if cleanup_success:
+                    cleanup_messages.append(f"Multi-project cleanup: {cleanup_msg}")
+                else:
+                    cleanup_messages.append(f"Multi-project cleanup failed: {cleanup_msg}")
+
+        except Exception as e:
+            cleanup_messages.append(f"Multi-project cleanup error: {str(e)}")
+
+    # Also cleanup single project worktree if it exists
+    elif task.worktree_path and task.root_folder:
+        try:
+            from app.services.git_worktree import GitWorktreeManager
+            git_manager = GitWorktreeManager(task.root_folder)
+
+            cleanup_success, cleanup_msg = git_manager.cleanup_task_worktree_and_branch(task.task_name, force=True)
+
+            if cleanup_success:
+                cleanup_messages.append(f"Single-project cleanup: {cleanup_msg}")
+            else:
+                cleanup_messages.append(f"Single-project cleanup failed: {cleanup_msg}")
+
+        except Exception as e:
+            cleanup_messages.append(f"Single-project cleanup error: {str(e)}")
+
+    # Update status to STOPPED immediately
     task.status = TaskStatus.STOPPED
+    task.process_pid = None  # Clear the PID
     db.commit()
 
-    return {"message": f"Task '{task_name}' stopped", "status": "stopped"}
+    # Prepare response message
+    base_message = f"Task '{task_name}' stopped immediately"
+    if cleanup_messages:
+        full_message = f"{base_message}. Git operations: {'; '.join(cleanup_messages)}"
+    else:
+        full_message = base_message
+
+    return {
+        "message": full_message,
+        "status": "stopped",
+        "process_killed": killed_process,
+        "termination_method": termination_method,
+        "cleanup_performed": len(cleanup_messages) > 0
+    }
 
 
 @router.post("/tasks/by-name/{task_name}/resume")
@@ -400,8 +645,248 @@ async def resume_task(
     return {"message": f"Task '{task_name}' resumed", "status": "running"}
 
 
+@router.post("/tasks/by-name/{task_name}/clear-and-restart")
+async def clear_and_restart_task(
+    task_name: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Clear all conversation history and restart the task from scratch."""
+    from app.models.interaction import ClaudeInteraction
+
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    # Stop the task if it's running
+    if task.status == TaskStatus.RUNNING:
+        # Kill the process if exists
+        if task.process_pid:
+            try:
+                import signal
+                os.kill(task.process_pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
+                pass  # Process already terminated
+            task.process_pid = None
+
+    # Delete all interactions for this task
+    deleted_count = db.query(ClaudeInteraction).filter(
+        ClaudeInteraction.task_id == task.id
+    ).delete()
+
+    # Clear user input queue to ensure fresh start
+    task.user_input_queue = None
+    task.user_input_pending = False
+
+    # Clean up and reinitiate git worktree and branch
+    cleanup_messages = []
+
+    # Handle multi-project tasks
+    if task.projects:
+        try:
+            from app.services.git_worktree import GitWorktreeManager
+
+            # Parse projects from JSON if needed
+            projects = task.projects if isinstance(task.projects, list) else json.loads(task.projects)
+
+            # Use the main project (task.root_folder) as the base for multi-project operations
+            if task.root_folder:
+                git_manager = GitWorktreeManager(task.root_folder)
+                main_project_path = task.root_folder
+
+                # Clean up multi-project worktrees
+                cleanup_success, cleanup_msg = git_manager.cleanup_multi_project_worktrees(
+                    task.task_name, projects, force=True
+                )
+                if cleanup_msg and cleanup_msg != "No worktrees to clean up":
+                    cleanup_messages.append(f"Cleanup: {cleanup_msg}")
+
+                # Recreate multi-project worktrees
+                create_success, project_paths, create_msg = git_manager.create_multi_project_worktrees(
+                    task.task_name, projects, task.base_branch
+                )
+
+                if create_success and create_msg and create_msg != "No worktrees needed":
+                    cleanup_messages.append(f"Reinitiated: {create_msg}")
+                    # Update task.worktree_path to the main project's worktree path for compatibility
+                    task.worktree_path = project_paths.get(main_project_path)
+                else:
+                    if create_msg:
+                        cleanup_messages.append(f"Reinitiation: {create_msg}")
+                    task.worktree_path = None
+            else:
+                cleanup_messages.append("Multi-project git cleanup/reinitiation skipped: No root_folder specified")
+
+        except Exception as e:
+            cleanup_messages.append(f"Multi-project git cleanup/reinitiation error: {str(e)}")
+            task.worktree_path = None
+
+    # Handle single-project tasks
+    elif task.root_folder:  # Only need root_folder to recreate worktree
+        try:
+            from app.services.git_worktree import GitWorktreeManager
+            git_manager = GitWorktreeManager(task.root_folder)
+
+            # First, clean up any existing worktree and branch
+            if task.worktree_path:
+                cleanup_success, cleanup_msg = git_manager.cleanup_task_worktree_and_branch(task.task_name, force=True)
+                cleanup_messages.append(f"Cleanup: {cleanup_msg}")
+
+            # Then, reinitiate (recreate) worktree and branch for fresh start
+            create_success, new_worktree_path, create_msg = git_manager.create_worktree(
+                task_name=task.task_name,
+                branch_name=task.branch_name,
+                base_branch=task.base_branch
+            )
+
+            if create_success:
+                task.worktree_path = new_worktree_path
+                cleanup_messages.append(f"Reinitiated: {create_msg}")
+            else:
+                cleanup_messages.append(f"Reinitiation failed: {create_msg}")
+                task.worktree_path = None
+
+        except Exception as e:
+            cleanup_messages.append(f"Git cleanup/reinitiation error: {str(e)}")
+            task.worktree_path = None
+
+    # Reset task state
+    task.status = TaskStatus.PENDING
+    task.current_iteration = 0
+    task.total_tokens_used = 0
+    task.latest_claude_response = None
+    task.claude_session_id = None  # Reset session for fresh start
+    task.error_message = None  # Clear any previous error messages on restart
+
+    db.commit()
+
+    # Start the task in background
+    executor = TaskExecutor()
+    background_tasks.add_task(executor.execute_task, task.id)
+
+    # Prepare response message
+    base_message = f"Task '{task_name}' conversation cleared ({deleted_count} interactions deleted) and restarted"
+    if cleanup_messages:
+        full_message = f"{base_message}. Git operations: {'; '.join(cleanup_messages)}"
+    else:
+        full_message = base_message
+
+    return {
+        "message": full_message,
+        "deleted_interactions": deleted_count,
+        "git_cleanup": cleanup_messages,
+        "status": "running"
+    }
+
+
+@router.post("/tasks/by-name/{task_name}/retry")
+async def retry_exhausted_task(
+    task_name: str,
+    background_tasks: BackgroundTasks,
+    additional_iterations: Optional[int] = 10,
+    additional_tokens: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Retry an EXHAUSTED task with increased limits.
+
+    Args:
+        task_name: Name of the task to retry
+        additional_iterations: Additional iterations to add (default: 10)
+        additional_tokens: Additional tokens to add (default: None - no token limit)
+    """
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    if task.status != TaskStatus.EXHAUSTED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task can only be retried from EXHAUSTED status. Current status: {task.status}"
+        )
+
+    # Update limits in end_criteria_config
+    end_criteria_config = task.end_criteria_config or {}
+
+    # Increase max iterations
+    current_max_iterations = end_criteria_config.get("max_iterations", 20)
+    end_criteria_config["max_iterations"] = current_max_iterations + additional_iterations
+
+    # Increase max tokens if specified
+    if additional_tokens:
+        current_max_tokens = end_criteria_config.get("max_tokens", 0)
+        end_criteria_config["max_tokens"] = current_max_tokens + additional_tokens
+
+    # Update task
+    task.end_criteria_config = end_criteria_config
+    task.status = TaskStatus.RUNNING
+    task.error_message = None  # Clear previous exhaustion error
+    db.commit()
+
+    # Resume task execution in background
+    executor = TaskExecutor()
+    background_tasks.add_task(executor.execute_task, task.id)
+
+    return {
+        "message": f"Task '{task_name}' retrying with increased limits",
+        "status": "running",
+        "new_limits": {
+            "max_iterations": end_criteria_config["max_iterations"],
+            "max_tokens": end_criteria_config.get("max_tokens")
+        }
+    }
+
+
+@router.put("/interactions/{interaction_id}")
+async def update_interaction(
+    interaction_id: str,
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """Update an interaction's content. Used for editing user messages."""
+    from app.models.interaction import ClaudeInteraction
+
+    content = request.get('content')
+    if not content:
+        raise HTTPException(status_code=400, detail="Content is required")
+
+    interaction = db.query(ClaudeInteraction).filter(ClaudeInteraction.id == interaction_id).first()
+    if not interaction:
+        raise HTTPException(status_code=404, detail=f"Interaction '{interaction_id}' not found")
+
+    # Only allow editing USER_REQUEST messages
+    if interaction.interaction_type != InteractionType.USER_REQUEST:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Can only edit user request messages, not {interaction.interaction_type.value}"
+        )
+
+    # Get the task to check status
+    task = db.query(Task).filter(Task.id == interaction.task_id).first()
+    if task.status == TaskStatus.RUNNING:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit interaction while task is running. Stop the task first."
+        )
+
+    # Update the interaction content
+    interaction.content = content
+    db.commit()
+    db.refresh(interaction)
+
+    return {
+        "message": "Interaction updated successfully",
+        "interaction": {
+            "id": interaction.id,
+            "type": interaction.interaction_type.value,
+            "content": interaction.content,
+            "timestamp": interaction.created_at.isoformat()
+        }
+    }
+
+
 @router.get("/tasks/by-name/{task_name}/conversation")
-async def get_task_conversation(task_name: str, db: Session = Depends(get_db)):
+async def get_task_conversation(task_name: str, collapse_tools: bool = True, db: Session = Depends(get_db)):
     """Get the full conversation history for a task (all interactions)."""
     task = db.query(Task).filter(Task.task_name == task_name).first()
     if not task:
@@ -410,31 +895,189 @@ async def get_task_conversation(task_name: str, db: Session = Depends(get_db)):
     # Get all interactions ordered by creation time
     interactions = sorted(task.interactions, key=lambda x: x.created_at)
 
+    def collapse_consecutive_tool_results(interactions_list):
+        """Collapse consecutive tool operations (claude_response + tool_result) into groups."""
+        if not collapse_tools:
+            return [
+                {
+                    "id": interaction.id,
+                    "type": interaction.interaction_type.value,
+                    "content": interaction.content,
+                    "timestamp": interaction.created_at.isoformat()
+                }
+                for interaction in interactions_list
+                if interaction.content and interaction.content.strip()  # Filter out empty content
+            ]
+
+        collapsed = []
+        current_tool_group = None
+        i = 0
+
+        def is_tool_use_message(content):
+            """Check if a claude_response is just a tool use message."""
+            if not content:
+                return False
+            content_lower = content.lower().strip()
+            return (content_lower.startswith("[tool use:") or
+                    "tool use:" in content_lower or
+                    content_lower == "[tool use: 1 tools]" or
+                    content_lower.startswith("i'll") and "tool" in content_lower)
+
+        while i < len(interactions_list):
+            interaction = interactions_list[i]
+
+            # Check if this starts a tool operation sequence
+            if (interaction.interaction_type.value == "claude_response" and
+                is_tool_use_message(interaction.content)):
+
+                # This is a tool use message, start collecting the sequence
+                if current_tool_group is None:
+                    current_tool_group = {
+                        "id": f"tool_group_{interaction.id}",
+                        "type": "tool_group",
+                        "tool_count": 0,
+                        "first_timestamp": interaction.created_at.isoformat(),
+                        "last_timestamp": interaction.created_at.isoformat(),
+                        "summary": "",
+                        "tools": []
+                    }
+
+                # Collect all following tool_results
+                i += 1
+                while i < len(interactions_list) and interactions_list[i].interaction_type.value == "tool_result":
+                    tool_result = interactions_list[i]
+                    current_tool_group["tool_count"] += 1
+                    current_tool_group["last_timestamp"] = tool_result.created_at.isoformat()
+                    current_tool_group["tools"].append({
+                        "id": tool_result.id,
+                        "type": tool_result.interaction_type.value,
+                        "content": tool_result.content,
+                        "timestamp": tool_result.created_at.isoformat()
+                    })
+                    i += 1
+
+                # Update summary
+                current_tool_group["summary"] = f"Tool execution results ({current_tool_group['tool_count']} tools)"
+
+                # Don't increment i here since we already moved past the tool_results
+                continue
+
+            elif interaction.interaction_type.value == "tool_result" and current_tool_group is not None:
+                # Standalone tool_result that should be added to current group
+                current_tool_group["tool_count"] += 1
+                current_tool_group["last_timestamp"] = interaction.created_at.isoformat()
+                current_tool_group["summary"] = f"Tool execution results ({current_tool_group['tool_count']} tools)"
+                current_tool_group["tools"].append({
+                    "id": interaction.id,
+                    "type": interaction.interaction_type.value,
+                    "content": interaction.content,
+                    "timestamp": interaction.created_at.isoformat()
+                })
+            else:
+                # Non-tool interaction or meaningful claude_response
+                # Finalize any current tool group
+                if current_tool_group is not None:
+                    collapsed.append(current_tool_group)
+                    current_tool_group = None
+
+                # Add the meaningful interaction (skip empty/simulated human if needed)
+                if not (interaction.interaction_type.value == "simulated_human" and
+                       (not interaction.content or interaction.content.strip() == "")):
+                    collapsed.append({
+                        "id": interaction.id,
+                        "type": interaction.interaction_type.value,
+                        "content": interaction.content,
+                        "timestamp": interaction.created_at.isoformat()
+                    })
+
+            i += 1
+
+        # Don't forget to add the last tool group if it exists
+        if current_tool_group is not None:
+            collapsed.append(current_tool_group)
+
+        return collapsed
+
+    conversation = collapse_consecutive_tool_results(interactions)
+
     return {
         "task_name": task.task_name,
         "status": task.status,
-        "conversation": [
-            {
-                "id": interaction.id,
-                "type": interaction.interaction_type.value,
-                "content": interaction.content,
-                "timestamp": interaction.created_at.isoformat()
-            }
-            for interaction in interactions
-        ]
+        "conversation": conversation
     }
+
+
+@router.get("/tasks/by-name/{task_name}/stream")
+async def stream_task_conversation(task_name: str, db: Session = Depends(get_db)):
+    """Stream task conversation updates in real-time using Server-Sent Events (SSE)."""
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    async def event_generator():
+        """Generate SSE events with new interactions."""
+        last_interaction_count = 0
+
+        while True:
+            # Refresh task to get latest status
+            db.refresh(task)
+
+            # Get all interactions
+            interactions = sorted(task.interactions, key=lambda x: x.created_at)
+            current_count = len(interactions)
+
+            # Send new interactions
+            if current_count > last_interaction_count:
+                new_interactions = interactions[last_interaction_count:]
+                for interaction in new_interactions:
+                    data = {
+                        "id": interaction.id,
+                        "type": interaction.interaction_type.value,
+                        "content": interaction.content,
+                        "timestamp": interaction.created_at.isoformat()
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+
+                last_interaction_count = current_count
+
+            # Send status update
+            status_data = {
+                "type": "status",
+                "status": task.status.value,
+                "total_interactions": current_count
+            }
+            yield f"data: {json.dumps(status_data)}\n\n"
+
+            # If task is in terminal state, stop streaming
+            if task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED]:
+                break
+
+            # Wait before next check
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.post("/tasks/by-name/{task_name}/set-input")
 async def set_custom_human_input(
     task_name: str,
     request: dict,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
     Set custom human input for the next interaction.
-    The task will use this instead of auto-generated response when resumed.
+    Uses high-priority queue system to ensure user input is never overlooked.
     """
+    from app.services.user_input_manager import UserInputManager
+
     task = db.query(Task).filter(Task.task_name == task_name).first()
     if not task:
         raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
@@ -442,15 +1085,145 @@ async def set_custom_human_input(
     if "input" not in request:
         raise HTTPException(status_code=400, detail="Missing 'input' field in request body")
 
-    # Store the custom input
-    task.custom_human_input = request["input"]
-    db.commit()
+    user_input = request["input"]
 
-    return {
-        "message": "Custom input set successfully",
+    # Use new high-priority user input queue system
+    # Use separate session to avoid transaction conflicts with endpoint session
+    print(f"🔍 DEBUG: Adding user input to queue for task {task.id} ({task_name}): '{user_input[:50]}...'")
+    success = UserInputManager.add_user_input(db, task.id, user_input, auto_commit=True, use_separate_session=True)
+    print(f"🔍 DEBUG: UserInputManager.add_user_input() returned: {success}")
+
+    if not success:
+        print(f"❌ DEBUG: Failed to add user input to queue for task {task.id}")
+        raise HTTPException(status_code=500, detail="Failed to add user input to queue")
+    else:
+        print(f"✅ DEBUG: Successfully added user input to queue for task {task.id} with separate session")
+
+    # ROOT CAUSE FIX: Ensure task executor is running to process user input
+    task_executor_restarted = False
+    if task.status.value == "RUNNING":
+        # Check if task has an active process
+        process_running = False
+        if task.process_pid:
+            try:
+                import os
+                os.kill(task.process_pid, 0)  # Signal 0 checks if process exists
+                process_running = True
+            except (OSError, ProcessLookupError):
+                # Process not found - clear stale PID
+                task.process_pid = None
+                # Don't commit here - we'll commit everything together at the end
+                process_running = False
+
+        # REAL-TIME INTERRUPTION: Kill active process and send user input immediately
+        if process_running:
+            print(f"⚡ REAL-TIME INTERRUPT: Killing active Claude process {task.process_pid} to send user input immediately")
+            try:
+                import signal
+                os.kill(task.process_pid, signal.SIGTERM)  # Graceful termination
+                print(f"✅ Process {task.process_pid} terminated for immediate user input processing")
+                task.process_pid = None
+                db.commit()
+            except (OSError, ProcessLookupError):
+                print(f"⚠️  Process {task.process_pid} already terminated")
+                task.process_pid = None
+                db.commit()
+
+            # Send user input immediately with session continuity
+            immediate_success = UserInputManager.trigger_immediate_processing(db, task.id, user_input)
+            print(f"🚀 Immediate processing triggered: {immediate_success}")
+            task_executor_restarted = False
+
+            # Mark the message as processed since it's being sent to Claude immediately
+            # This implements the rule: "as long as it is sent to Claude, it is processed"
+            if immediate_success:
+                processed_input = UserInputManager.get_next_user_input(db, task.id)
+                if processed_input:
+                    print(f"✅ Marked message as processed (immediate): {processed_input[:50]}...")
+
+        else:
+            # No active process - restart executor as before
+            print(f"🔄 Task {task_name} is RUNNING but no active process - restarting task executor to process user input")
+            print(f"🔍 DEBUG: Before task executor restart - task.user_input_queue = {task.user_input_queue}")
+            from app.services.task_executor import TaskExecutor
+            executor = TaskExecutor()
+            background_tasks.add_task(executor.execute_task, task.id)
+            task_executor_restarted = True
+            immediate_success = False
+            print(f"✅ Task executor restarted for {task_name} - user input will be processed by task executor")
+            print(f"🔍 DEBUG: After task executor restart - task.user_input_queue = {task.user_input_queue}")
+
+            # Mark the message as processed since it's being sent to Claude
+            # This implements the rule: "as long as it is sent to Claude, it is processed"
+            processed_input = UserInputManager.get_next_user_input(db, task.id)
+            if processed_input:
+                print(f"✅ Marked message as processed: {processed_input[:50]}...")
+
+    else:
+        # Task not running - no immediate processing
+        immediate_success = False
+        task_executor_restarted = False
+
+    # CRITICAL FIX: Use fresh session to see UserInputManager's committed changes
+    from app.database import SessionLocal
+    fresh_db = SessionLocal()
+    try:
+        fresh_task = fresh_db.query(Task).filter(Task.id == task.id).first()
+        print(f"🔍 DEBUG: After UserInputManager commit - fresh query shows task.user_input_queue = {fresh_task.user_input_queue if fresh_task else 'Task not found'}")
+        # Update our task object with the fresh data
+        if fresh_task:
+            task.user_input_queue = fresh_task.user_input_queue
+            task.user_input_pending = fresh_task.user_input_pending
+    finally:
+        fresh_db.close()
+
+    # Set legacy field for backward compatibility
+    task.custom_human_input = user_input
+    print(f"🔍 DEBUG: About to commit legacy field for task {task.id}")
+    db.commit()
+    print(f"✅ DEBUG: Legacy field commit completed for task {task.id}")
+
+    response = {
+        "message": "User input processed successfully",
         "task_name": task_name,
-        "input_preview": request["input"][:100] + "..." if len(request["input"]) > 100 else request["input"]
+        "input_preview": user_input[:100] + "..." if len(user_input) > 100 else user_input,
+        "queue_priority": "HIGH",
+        "guaranteed_processing": True,
+        "immediate_processing": immediate_success,
+        "task_executor_restarted": task_executor_restarted
     }
+
+    if immediate_success:
+        response["message"] = "⚡ REAL-TIME INTERRUPT: Claude process interrupted - your message sent immediately"
+        response["processing_type"] = "REAL_TIME_INTERRUPT"
+    elif task_executor_restarted:
+        response["message"] = "Task executor restarted - your message will be processed by the active task conversation"
+        response["processing_type"] = "EXECUTOR_RESTART"
+    else:
+        response["message"] = "User input added to queue - will be processed by task executor"
+        response["processing_type"] = "QUEUED_FOR_EXECUTOR"
+
+    return response
+
+
+@router.get("/tasks/by-name/{task_name}/input-queue-status")
+async def get_input_queue_status(
+    task_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get the status of the user input queue for a task.
+    """
+    from app.services.user_input_manager import UserInputManager
+
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    status = UserInputManager.get_queue_status(db, task.id)
+    status["task_name"] = task_name
+
+    return status
 
 
 @router.get("/browse-directories")
@@ -529,6 +1302,243 @@ async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db:
     return response
 
 
+def _is_task_running(task: Task, db: Session) -> bool:
+    """Check if a task has an active process running."""
+    if not task.process_pid:
+        return False
+
+    try:
+        import os
+        os.kill(task.process_pid, 0)  # Signal 0 checks if process exists
+        return True
+    except (OSError, ProcessLookupError):
+        # Process not found or we don't have permission - it's not running
+        # Clear the stale PID from the database
+        task.process_pid = None
+        db.commit()
+        return False
+
+
+@router.delete("/tasks/by-name/{task_name}/worktree")
+async def delete_task_worktree(task_name: str, auto_stop: bool = False, db: Session = Depends(get_db)):
+    """Delete only the worktree for a task, keeping the task and conversation history intact.
+
+    Args:
+        task_name: Name of the task
+        auto_stop: If True, automatically stop the task first if it's running (default: False)
+
+    IMPORTANT: By default, the task must be stopped completely before worktree deletion is allowed.
+    This enforces the correct workflow: stop task → delete worktree → restart if needed.
+    Use auto_stop=True to automatically stop the task first.
+    """
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    stop_messages = []
+
+    # Handle running task - either auto-stop or error
+    is_task_active = _is_task_running(task, db) or task.status in [TaskStatus.RUNNING, TaskStatus.PAUSED, TaskStatus.TESTING]
+
+    if is_task_active:
+        if auto_stop:
+            # Auto-stop the task first
+            import os
+            import signal
+            import asyncio
+
+            # Force-kill the subprocess if PID is available
+            if task.process_pid:
+                try:
+                    # Check if process exists and kill it
+                    try:
+                        os.kill(task.process_pid, 0)  # Check if process exists
+                        os.kill(task.process_pid, signal.SIGTERM)
+
+                        # Wait briefly for graceful shutdown
+                        for _ in range(5):
+                            try:
+                                os.kill(task.process_pid, 0)
+                                await asyncio.sleep(0.1)
+                            except ProcessLookupError:
+                                break
+
+                        # Force kill if still running
+                        try:
+                            os.kill(task.process_pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass  # Already dead
+
+                        stop_messages.append(f"Auto-stopped running process (PID: {task.process_pid})")
+                    except ProcessLookupError:
+                        stop_messages.append(f"Process already terminated (PID: {task.process_pid})")
+                except Exception as e:
+                    stop_messages.append(f"Warning: Could not stop process {task.process_pid}: {e}")
+
+            # Update task status to STOPPED
+            task.status = TaskStatus.STOPPED
+            task.process_pid = None
+            task.error_message = None
+            db.commit()
+            stop_messages.append(f"Task status updated to STOPPED")
+
+        else:
+            # Traditional error approach when auto_stop=False
+            if _is_task_running(task, db):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Task '{task_name}' is currently running. Please stop the task first before deleting its worktree. "
+                           f"Use the stop endpoint, then delete worktree, then restart if needed. "
+                           f"Or use auto_stop=true query parameter to automatically stop the task first."
+                )
+
+            if task.status in [TaskStatus.RUNNING, TaskStatus.PAUSED, TaskStatus.TESTING]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Task '{task_name}' has status '{task.status.value}' indicating it may still be active. "
+                           f"Please stop the task completely first before deleting its worktree. "
+                           f"Or use auto_stop=true query parameter to automatically stop the task first."
+                )
+
+    cleanup_messages = []
+
+    # Check if this is a multi-project task
+    if task.projects:
+        try:
+            import json
+            from app.services.git_worktree import GitWorktreeManager
+
+            # Parse projects from JSON if needed
+            projects = task.projects if isinstance(task.projects, list) else json.loads(task.projects)
+
+            # Use the main project (task.root_folder) as the base for multi-project operations
+            if task.root_folder:
+                git_manager = GitWorktreeManager(task.root_folder)
+
+                # Clean up multi-project worktrees
+                cleanup_success, cleanup_msg = git_manager.cleanup_multi_project_worktrees(
+                    task.task_name, projects, force=True
+                )
+
+                if cleanup_success:
+                    cleanup_messages.append(f"Multi-project worktree cleanup: {cleanup_msg}")
+                else:
+                    cleanup_messages.append(f"Multi-project worktree cleanup failed: {cleanup_msg}")
+
+        except Exception as e:
+            cleanup_messages.append(f"Multi-project worktree cleanup error: {str(e)}")
+
+    # Also cleanup single project worktree if it exists and no multi-project config
+    elif task.worktree_path and task.root_folder:
+        try:
+            from app.services.git_worktree import GitWorktreeManager
+            worktree_manager = GitWorktreeManager(task.root_folder)
+            success, message = worktree_manager.remove_worktree(task_name, force=True)
+
+            if success:
+                cleanup_messages.append(f"Single-project worktree cleanup: {message}")
+            else:
+                cleanup_messages.append(f"Single-project worktree cleanup failed: {message}")
+
+        except Exception as e:
+            cleanup_messages.append(f"Single-project worktree cleanup error: {str(e)}")
+
+    # Check if any cleanup was performed
+    if not cleanup_messages:
+        if not task.worktree_path and not task.projects:
+            raise HTTPException(status_code=400, detail=f"Task '{task_name}' has no worktree")
+        if not task.root_folder:
+            raise HTTPException(status_code=400, detail=f"Task '{task_name}' has no root_folder configured")
+
+    # Clear worktree_path in database but keep the task
+    task.worktree_path = None
+    db.commit()
+
+    # Prepare response message
+    base_message = f"Worktree for task '{task_name}' removed successfully"
+    all_messages = []
+
+    if stop_messages:
+        all_messages.extend(stop_messages)
+    if cleanup_messages:
+        all_messages.extend(cleanup_messages)
+
+    if all_messages:
+        full_message = f"{base_message}. Details: {'; '.join(all_messages)}"
+    else:
+        full_message = base_message
+
+    return {
+        "message": full_message,
+        "task_preserved": True,
+        "auto_stopped": len(stop_messages) > 0,
+        "cleanup_performed": len(cleanup_messages) > 0
+    }
+
+
+@router.put("/tasks/by-name/{task_name}", response_model=TaskResponse)
+async def update_task(task_name: str, task_update: dict, db: Session = Depends(get_db)):
+    """Update task details (description, root_folder, branch_name, base_branch, custom_human_input)."""
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    # Update allowed fields
+    if "description" in task_update and task_update["description"]:
+        task.description = task_update["description"]
+
+    if "root_folder" in task_update:
+        task.root_folder = task_update["root_folder"]
+
+    if "branch_name" in task_update:
+        task.branch_name = task_update["branch_name"]
+
+    if "base_branch" in task_update:
+        task.base_branch = task_update["base_branch"]
+
+    if "git_repo" in task_update:
+        task.git_repo = task_update["git_repo"]
+
+    if "end_criteria_config" in task_update:
+        task.end_criteria_config = task_update["end_criteria_config"]
+
+    if "custom_human_input" in task_update:
+        task.custom_human_input = task_update["custom_human_input"]
+
+    if "projects" in task_update:
+        task.projects = task_update["projects"]
+
+    if "project_context" in task_update:
+        task.project_context = task_update["project_context"]
+
+    db.commit()
+    db.refresh(task)
+
+    return TaskResponse(
+        id=task.id,
+        task_name=task.task_name,
+        session_id=task.session_id,
+        description=task.description,
+        status=task.status,
+        root_folder=task.root_folder,
+        branch_name=task.branch_name,
+        base_branch=task.base_branch,
+        git_repo=task.git_repo,
+        worktree_path=task.worktree_path,
+        summary=task.summary,
+        error_message=task.error_message,
+        end_criteria_config=task.end_criteria_config,
+        total_tokens_used=task.total_tokens_used,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+        completed_at=task.completed_at,
+        test_cases=[],
+        interactions=[],
+        projects=task.projects,
+        project_context=task.project_context
+    )
+
+
 @router.post("/tasks/by-name/{task_name}/clone")
 async def clone_task(task_name: str, db: Session = Depends(get_db)):
     """Clone an existing task with a new name, preserving all parameters."""
@@ -563,6 +1573,10 @@ async def clone_task(task_name: str, db: Session = Depends(get_db)):
         error_message=None,
         worktree_path=None,
         custom_human_input=None,
+        # Copy multi-project and additional fields
+        projects=original_task.projects,
+        project_context=original_task.project_context,
+        end_criteria_config=original_task.end_criteria_config,
     )
 
     db.add(new_task)
@@ -573,19 +1587,7 @@ async def clone_task(task_name: str, db: Session = Depends(get_db)):
         "message": f"Task cloned successfully",
         "original_task": task_name,
         "new_task": new_task_name,
-        "task": TaskResponse(
-            id=new_task.id,
-            task_name=new_task.task_name,
-            description=new_task.description,
-            root_folder=new_task.root_folder,
-            branch_name=new_task.branch_name,
-            base_branch=new_task.base_branch,
-            status=new_task.status,
-            summary=new_task.summary,
-            error_message=new_task.error_message,
-            created_at=new_task.created_at,
-            updated_at=new_task.updated_at,
-        )
+        "task": TaskResponse.model_validate(new_task)
     }
 
 
@@ -731,6 +1733,12 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
     failed_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.FAILED])
     pending_tests = len([tc for tc in task.test_cases if tc.status == TestCaseStatus.PENDING])
 
+    # Calculate interaction count (Claude responses)
+    interaction_count = len([
+        i for i in task.interactions
+        if i.interaction_type == InteractionType.CLAUDE_RESPONSE
+    ])
+
     # Get latest Claude response
     latest_claude_response = None
     claude_responses = [
@@ -742,6 +1750,20 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
 
     # Check if waiting for input (PAUSED status means waiting)
     waiting_for_input = task.status == TaskStatus.PAUSED
+
+    # Check if there's an active process running
+    process_running = False
+    if task.process_pid:
+        try:
+            import os
+            os.kill(task.process_pid, 0)  # Signal 0 checks if process exists
+            process_running = True
+        except (OSError, ProcessLookupError):
+            # Process not found or we don't have permission - it's not running
+            # Clear the stale PID from the database
+            task.process_pid = None
+            db.commit()
+            process_running = False
 
     # Generate progress message
     progress_messages = {
@@ -772,6 +1794,13 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
         },
         latest_claude_response=latest_claude_response,
         waiting_for_input=waiting_for_input,
+        projects=task.projects,
+        project_context=task.project_context,
+        end_criteria_config=task.end_criteria_config,
+        total_tokens_used=task.total_tokens_used,
+        interaction_count=interaction_count,
+        process_running=process_running,
+        process_pid=task.process_pid,
     )
 
 
@@ -800,6 +1829,7 @@ async def create_prompt(prompt_data: PromptCreate, db: Session = Depends(get_db)
         content=prompt_data.content,
         category=prompt_data.category,
         tags=prompt_data.tags,
+        criteria_config=prompt_data.criteria_config,
     )
 
     db.add(prompt)
@@ -880,6 +1910,8 @@ async def update_prompt(
         prompt.category = prompt_data.category
     if prompt_data.tags is not None:
         prompt.tags = prompt_data.tags
+    if prompt_data.criteria_config is not None:
+        prompt.criteria_config = prompt_data.criteria_config
 
     prompt.updated_at = datetime.utcnow()
 

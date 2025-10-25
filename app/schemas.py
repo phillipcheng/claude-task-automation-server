@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.models.task import TaskStatus
 from app.models.test_case import TestCaseType, TestCaseStatus
@@ -28,6 +28,22 @@ class TaskCreate(BaseModel):
     use_worktree: bool = True  # Use git worktree for isolation (default: True)
     auto_start: bool = False  # Automatically start task execution (default: False)
     project_path: Optional[str] = None  # Deprecated, use root_folder
+
+    # Project context for Claude prompts
+    project_context: Optional[str] = None  # User-specified project context that will be included in Claude's prompts
+
+    # End criteria configuration
+    end_criteria: Optional[str] = None  # Success criteria description
+    max_iterations: Optional[int] = 20  # Maximum conversation iterations
+    max_tokens: Optional[int] = None  # Maximum cumulative output tokens
+
+    # Multi-project configuration
+    # Format: [
+    #   {"path": "/path/to/project1", "access": "write", "context": "Main service project", "branch_name": "feature-branch"},
+    #   {"path": "/path/to/project2", "access": "read", "context": "Shared SDK for runtime operations"},
+    #   {"path": "/path/to/project3", "access": "write", "context": "Testing utilities"}
+    # ]
+    projects: Optional[List[Dict[str, Any]]] = None  # Multi-project configuration with read/write access
 
 
 class TestCaseResponse(BaseModel):
@@ -66,11 +82,16 @@ class TaskResponse(BaseModel):
     status: TaskStatus
     summary: Optional[str]
     error_message: Optional[str]
+    end_criteria_config: Optional[dict] = None
+    total_tokens_used: Optional[int] = 0
+    interaction_count: Optional[int] = 0
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime]
     test_cases: List[TestCaseResponse] = []
     interactions: List[InteractionResponse] = []
+    projects: Optional[List[Dict[str, Any]]] = None
+    project_context: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -85,10 +106,17 @@ class TaskStatusResponse(BaseModel):
     status: TaskStatus
     summary: Optional[str]
     error_message: Optional[str]
+    end_criteria_config: Optional[dict] = None
+    total_tokens_used: Optional[int] = 0
+    interaction_count: Optional[int] = 0
     progress: str
     test_summary: dict
     latest_claude_response: Optional[str] = None  # Latest response from Claude
     waiting_for_input: bool = False  # Whether Claude is waiting for user input
+    projects: Optional[List[Dict[str, Any]]] = None
+    project_context: Optional[str] = None
+    process_running: bool = False  # Whether there's an active Claude CLI process running
+    process_pid: Optional[int] = None  # The PID of the running process (if any)
 
     class Config:
         from_attributes = True
@@ -100,6 +128,7 @@ class PromptCreate(BaseModel):
     content: str
     category: Optional[str] = None
     tags: Optional[str] = None
+    criteria_config: Optional[dict] = None  # For category="criteria": {"criteria": "...", "max_iterations": 20, "max_tokens": 10000}
 
 
 class PromptUpdate(BaseModel):
@@ -107,6 +136,7 @@ class PromptUpdate(BaseModel):
     content: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[str] = None
+    criteria_config: Optional[dict] = None
 
 
 class PromptResponse(BaseModel):
@@ -116,6 +146,7 @@ class PromptResponse(BaseModel):
     category: Optional[str]
     tags: Optional[str]
     usage_count: int
+    criteria_config: Optional[dict]
     created_at: datetime
     updated_at: datetime
     last_used_at: Optional[datetime]
