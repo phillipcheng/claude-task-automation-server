@@ -1,0 +1,152 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [82876]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:58767 - "GET /health HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:59070 - "POST /api/v1/tasks/by-name/immediate_test_final/set-input HTTP/1.1" 200 OK
+Background message sending failed: Claude CLI error (exit code 1): No conversation found with session ID: 8d7bb055-ab38-42de-bb06-320fb872646e
+
+INFO:     127.0.0.1:59240 - "GET /api/v1/tasks/by-name/immediate_test_final/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59375 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59447 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59505 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59561 - "POST /api/v1/tasks/by-name/immediate_test_fresh/start HTTP/1.1" 200 OK
+Task d172fadb-a123-4e1a-9e6c-180999cb573a: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:59938 - "POST /api/v1/tasks/by-name/immediate_test_fresh/set-input HTTP/1.1" 422 Unprocessable Content
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:60413 - "POST /api/v1/tasks/by-name/immediate_test_fresh/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61335 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61431 - "POST /api/v1/tasks/by-name/step_by_step_verification/start HTTP/1.1" 200 OK
+Task 2895db4a-3e46-4b54-9fc3-2baf5154074b: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:61658 - "GET /api/v1/tasks/by-name/step_by_step_verification/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62786 - "POST /api/v1/tasks/by-name/step_by_step_verification/set-input HTTP/1.1" 422 Unprocessable Content
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:62929 - "POST /api/v1/tasks/by-name/step_by_step_verification/set-input HTTP/1.1" 200 OK
+Background message sending failed: Claude CLI error (exit code 1): No conversation found with session ID: 6b77d2a0-b903-43e7-8670-425bca467ff8
+
+INFO:     127.0.0.1:63074 - "GET /api/v1/tasks/by-name/step_by_step_verification/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63288 - "GET /api/v1/tasks/by-name/step_by_step_verification/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63519 - "GET /api/v1/tasks/by-name/step_by_step_verification/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63991 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63991 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63991 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63991 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63991 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63991 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64051 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/clear-and-restart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64051 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64051 - "GET /api/v1/tasks/by-name/step_by_step_verification/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64056 - "GET /api/v1/tasks/by-name/immediate_test_fresh/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64057 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64062 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64061 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64117 - "GET /api/v1/tasks/by-name/step_by_step_verification HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64117 - "GET /api/v1/tasks/by-name/step_by_step_verification HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64117 - "GET /api/v1/tasks/by-name/step_by_step_verification HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64117 - "GET /api/v1/tasks/by-name/step_by_step_verification HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64117 - "GET /api/v1/tasks/by-name/step_by_step_verification HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64224 - "POST /api/v1/tasks/by-name/step_by_step_verification/stop HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64224 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64224 - "GET /api/v1/tasks/by-name/step_by_step_verification/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64227 - "GET /api/v1/tasks/by-name/immediate_test_fresh/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64229 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64231 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64233 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64234 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64249 - "DELETE /api/v1/tasks/by-name/step_by_step_verification HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64249 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64249 - "GET /api/v1/tasks/by-name/immediate_test_fresh/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64252 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64254 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64256 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64257 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64286 - "DELETE /api/v1/tasks/by-name/immediate_test_fresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64286 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64286 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64292 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64289 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64291 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64291 - "POST /api/v1/tasks/by-name/immediate_test_final/stop HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64291 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64291 - "GET /api/v1/tasks/by-name/immediate_test_final/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64289 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64292 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64286 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64400 - "DELETE /api/v1/tasks/by-name/immediate_test_final HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64400 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64400 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64403 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64404 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64404 - "POST /api/v1/tasks/by-name/test_immediate_processing/stop HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64404 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64404 - "GET /api/v1/tasks/by-name/test_immediate_processing/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64403 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64400 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64450 - "DELETE /api/v1/tasks/by-name/test_immediate_processing HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64450 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64450 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64452 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64452 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64490 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64579 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/clear-and-restart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64579 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64579 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64667 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64667 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64667 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64757 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:64757 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64757 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65012 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65012 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65258 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51415 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:51981 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:51981 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51981 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+Background message sending failed: Claude CLI error (exit code 1): No conversation found with session ID: 3e03aa7f-f6ee-4eb9-aa5b-5df666404b6d
+
+INFO:     127.0.0.1:52787 - "GET /api/v1/tasks/by-name/step_by_step_verification/conversation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52847 - "GET /api/v1/tasks/by-name/step_by_step_verification/conversation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52907 - "GET /api/v1/tasks/by-name/step_by_step_verification/conversation HTTP/1.1" 404 Not Found
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:53019 - "GET /api/v1/tasks/by-name/immediate_test_fresh/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53234 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53383 - "POST /api/v1/tasks/by-name/session_debug_test/start HTTP/1.1" 200 OK
+Task 29e1627f-5d3a-4f57-92b9-6302b15abeb8: No worktree configured, using fallback path: /tmp/claude_projects

@@ -1,0 +1,41 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [67083]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:55828 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55885 - "POST /api/v1/tasks/by-name/debug_message_test/start HTTP/1.1" 200 OK
+Task 6e54e82e-1012-437c-acf0-6990fa553cbc: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 TASK EXECUTOR DEBUG: task_id=6e54e82e-1012-437c-acf0-6990fa553cbc, set claude_session_id=9d5548d2-fa46-4a25-893d-f9410bcfeef9
+🔍 DEBUG: Adding user input to queue for task 6e54e82e-1012-437c-acf0-6990fa553cbc (debug_message_test): 'I want to work on a Python project...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 6e54e82e-1012-437c-acf0-6990fa553cbc, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task debug_message_test
+🔍 UserInputManager DEBUG: Current queue: None
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'd9512cf4-50ea-4cc5-ad74-5b87b0a58128', 'input': 'I want to work on a Python project', 'timestamp': '2025-10-25T04:16:26.404450', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'd9512cf4-50ea-4cc5-ad74-5b87b0a58128', 'input': 'I want to work on a Python project', 'timestamp': '2025-10-25T04:16:26.404450', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'd9512cf4-50ea-4cc5-ad74-5b87b0a58128', 'input': 'I want to work on a Python project', 'timestamp': '2025-10-25T04:16:26.404450', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'd9512cf4-50ea-4cc5-ad74-5b87b0a58128', 'input': 'I want to work on a Python project', 'processed': False, 'timestamp': '2025-10-25T04:16:26.404450'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 6e54e82e-1012-437c-acf0-6990fa553cbc with separate session
+🔄 Task debug_message_test is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = None
+✅ Task executor restarted for debug_message_test - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = None
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = None
+🔍 DEBUG: About to commit legacy field for task 6e54e82e-1012-437c-acf0-6990fa553cbc
+✅ DEBUG: Legacy field commit completed for task 6e54e82e-1012-437c-acf0-6990fa553cbc
+INFO:     127.0.0.1:56024 - "POST /api/v1/tasks/by-name/debug_message_test/set-input HTTP/1.1" 200 OK
+Task 6e54e82e-1012-437c-acf0-6990fa553cbc: No worktree configured, using fallback path: /tmp/claude_projects

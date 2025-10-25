@@ -1,0 +1,382 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [40987]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:56224 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 422 Unprocessable Content
+🔍 DEBUG: Adding user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a (add_scene_event_codes_to_stra): 'SQLALCHEMY FIX TEST...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 8d71a584-a288-4993-bca2-c445249c7d1a, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task add_scene_event_codes_to_stra
+🔍 UserInputManager DEBUG: Current queue: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'timestamp': '2025-10-25T03:22:23.735666', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'timestamp': '2025-10-25T03:22:23.735666', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'timestamp': '2025-10-25T03:22:23.735666', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a with separate session
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}]
+🔍 DEBUG: About to commit legacy field for task 8d71a584-a288-4993-bca2-c445249c7d1a
+✅ DEBUG: Legacy field commit completed for task 8d71a584-a288-4993-bca2-c445249c7d1a
+INFO:     127.0.0.1:56290 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56349 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+🔍 DEBUG: Adding user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a (add_scene_event_codes_to_stra): 'Now test if Claude can see and respond to this mes...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 8d71a584-a288-4993-bca2-c445249c7d1a, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task add_scene_event_codes_to_stra
+🔍 UserInputManager DEBUG: Current queue: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': '178d222e-5549-45fc-8a10-86aa685567af', 'input': 'Now test if Claude can see and respond to this message', 'timestamp': '2025-10-25T03:22:53.856182', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}, {'id': '178d222e-5549-45fc-8a10-86aa685567af', 'input': 'Now test if Claude can see and respond to this message', 'timestamp': '2025-10-25T03:22:53.856182', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}, {'id': '178d222e-5549-45fc-8a10-86aa685567af', 'input': 'Now test if Claude can see and respond to this message', 'timestamp': '2025-10-25T03:22:53.856182', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}, {'id': '178d222e-5549-45fc-8a10-86aa685567af', 'input': 'Now test if Claude can see and respond to this message', 'processed': False, 'timestamp': '2025-10-25T03:22:53.856182'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a with separate session
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'manual-test', 'input': 'Manual database test', 'processed': False, 'timestamp': '2025-10-24 20:21:33.000000'}, {'id': '2df50a90-c274-4749-a657-6952b26ce76a', 'input': 'SQLALCHEMY FIX TEST', 'processed': False, 'timestamp': '2025-10-25T03:22:23.735666'}]
+🔍 DEBUG: About to commit legacy field for task 8d71a584-a288-4993-bca2-c445249c7d1a
+✅ DEBUG: Legacy field commit completed for task 8d71a584-a288-4993-bca2-c445249c7d1a
+INFO:     127.0.0.1:56655 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56719 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57516 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/clear-and-restart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57600 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57733 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57803 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57879 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57971 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58042 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+🔍 DEBUG: Adding user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a (add_scene_event_codes_to_stra): 'DETAILED TEST 1: How many Go files did you scan in...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 8d71a584-a288-4993-bca2-c445249c7d1a, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task add_scene_event_codes_to_stra
+🔍 UserInputManager DEBUG: Current queue: []
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'timestamp': '2025-10-25T03:25:17.221025', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'timestamp': '2025-10-25T03:25:17.221025', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'timestamp': '2025-10-25T03:25:17.221025', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a with separate session
+🔄 Task add_scene_event_codes_to_stra is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = []
+✅ Task executor restarted for add_scene_event_codes_to_stra - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = []
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = []
+🔍 DEBUG: About to commit legacy field for task 8d71a584-a288-4993-bca2-c445249c7d1a
+✅ DEBUG: Legacy field commit completed for task 8d71a584-a288-4993-bca2-c445249c7d1a
+INFO:     127.0.0.1:58321 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58444 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58672 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58870 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58983 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59098 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59398 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+🔍 DEBUG: Adding user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a (add_scene_event_codes_to_stra): 'DETAILED TEST 2: I notice my first message is stil...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 8d71a584-a288-4993-bca2-c445249c7d1a, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task add_scene_event_codes_to_stra
+🔍 UserInputManager DEBUG: Current queue: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'da7df572-be43-4b3a-9f19-4a0bc69594bb', 'input': 'DETAILED TEST 2: I notice my first message is still pending. Can you see this second message?', 'timestamp': '2025-10-25T03:26:23.935053', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}, {'id': 'da7df572-be43-4b3a-9f19-4a0bc69594bb', 'input': 'DETAILED TEST 2: I notice my first message is still pending. Can you see this second message?', 'timestamp': '2025-10-25T03:26:23.935053', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}, {'id': 'da7df572-be43-4b3a-9f19-4a0bc69594bb', 'input': 'DETAILED TEST 2: I notice my first message is still pending. Can you see this second message?', 'timestamp': '2025-10-25T03:26:23.935053', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}, {'id': 'da7df572-be43-4b3a-9f19-4a0bc69594bb', 'input': 'DETAILED TEST 2: I notice my first message is still pending. Can you see this second message?', 'processed': False, 'timestamp': '2025-10-25T03:26:23.935053'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a with separate session
+🔄 Task add_scene_event_codes_to_stra is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}]
+✅ Task executor restarted for add_scene_event_codes_to_stra - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}]
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': '653fdeb2-5233-46e9-89aa-308b5211c856', 'input': 'DETAILED TEST 1: How many Go files did you scan in the project? Please give me a specific count.', 'processed': False, 'timestamp': '2025-10-25T03:25:17.221025'}]
+🔍 DEBUG: About to commit legacy field for task 8d71a584-a288-4993-bca2-c445249c7d1a
+✅ DEBUG: Legacy field commit completed for task 8d71a584-a288-4993-bca2-c445249c7d1a
+INFO:     127.0.0.1:59677 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59786 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60359 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60554 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60697 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/resume HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:60953 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61033 - "POST /api/v1/tasks/by-name/test_user_input_flow/start HTTP/1.1" 200 OK
+Task d91f94f6-03ab-46b4-9215-dfb1fe4f4417: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:61207 - "GET /api/v1/tasks/by-name/test_user_input_flow/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61390 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61549 - "POST /api/v1/tasks/by-name/test_user_input_flow/set-input HTTP/1.1" 422 Unprocessable Content
+🔍 DEBUG: Adding user input to queue for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417 (test_user_input_flow): 'How many Python files have you found so far?...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task test_user_input_flow
+🔍 UserInputManager DEBUG: Current queue: None
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'timestamp': '2025-10-25T03:28:09.774147', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'timestamp': '2025-10-25T03:28:09.774147', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'timestamp': '2025-10-25T03:28:09.774147', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417 with separate session
+🔄 Task test_user_input_flow is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = None
+✅ Task executor restarted for test_user_input_flow - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = None
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = None
+🔍 DEBUG: About to commit legacy field for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417
+✅ DEBUG: Legacy field commit completed for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417
+INFO:     127.0.0.1:61655 - "POST /api/v1/tasks/by-name/test_user_input_flow/set-input HTTP/1.1" 200 OK
+Task d91f94f6-03ab-46b4-9215-dfb1fe4f4417: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:61840 - "GET /api/v1/tasks/by-name/test_user_input_flow/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62316 - "GET /api/v1/tasks/by-name/test_user_input_flow/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62520 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=04f4b02b-a42c-4ebe-ac4c-228b6310f32c
+INFO:     127.0.0.1:62735 - "GET /api/v1/tasks/by-name/test_user_input_flow/status HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=04f4b02b-a42c-4ebe-ac4c-228b6310f32c
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=04f4b02b-a42c-4ebe-ac4c-228b6310f32c
+INFO:     127.0.0.1:63096 - "GET /api/v1/tasks/by-name/test_user_input_flow/input-queue-status HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=04f4b02b-a42c-4ebe-ac4c-228b6310f32c
+INFO:     127.0.0.1:63328 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=04f4b02b-a42c-4ebe-ac4c-228b6310f32c
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=04f4b02b-a42c-4ebe-ac4c-228b6310f32c
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+INFO:     127.0.0.1:63729 - "POST /api/v1/tasks/by-name/test_user_input_flow/set-input HTTP/1.1" 422 Unprocessable Content
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 DEBUG: Adding user input to queue for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417 (test_user_input_flow): 'Which Python file is the largest by size?...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task test_user_input_flow
+🔍 UserInputManager DEBUG: Current queue: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': '5ecb48e7-c2a7-4833-9bc4-de5bdb342197', 'input': 'Which Python file is the largest by size?', 'timestamp': '2025-10-25T03:29:23.437451', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}, {'id': '5ecb48e7-c2a7-4833-9bc4-de5bdb342197', 'input': 'Which Python file is the largest by size?', 'timestamp': '2025-10-25T03:29:23.437451', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}, {'id': '5ecb48e7-c2a7-4833-9bc4-de5bdb342197', 'input': 'Which Python file is the largest by size?', 'timestamp': '2025-10-25T03:29:23.437451', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}, {'id': '5ecb48e7-c2a7-4833-9bc4-de5bdb342197', 'input': 'Which Python file is the largest by size?', 'processed': False, 'timestamp': '2025-10-25T03:29:23.437451'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417 with separate session
+🔄 Task test_user_input_flow is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}]
+✅ Task executor restarted for test_user_input_flow - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}]
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': '3e5d82bd-88fa-442b-a825-db944a7389da', 'input': 'How many Python files have you found so far?', 'processed': False, 'timestamp': '2025-10-25T03:28:09.774147'}]
+🔍 DEBUG: About to commit legacy field for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417
+✅ DEBUG: Legacy field commit completed for task d91f94f6-03ab-46b4-9215-dfb1fe4f4417
+INFO:     127.0.0.1:63817 - "POST /api/v1/tasks/by-name/test_user_input_flow/set-input HTTP/1.1" 200 OK
+Task d91f94f6-03ab-46b4-9215-dfb1fe4f4417: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+INFO:     127.0.0.1:64275 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64585 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64812 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65041 - "GET /api/v1/tasks/by-name/test_user_input_flow/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65137 - "GET /api/v1/tasks/by-name/test_user_input_flow/input-queue-status HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+🔍 TASK EXECUTOR DEBUG: task_id=d91f94f6-03ab-46b4-9215-dfb1fe4f4417, set claude_session_id=b4220fb9-2687-43bc-b70f-31d4ff9bfe06
+INFO:     127.0.0.1:50276 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50371 - "POST /api/v1/tasks/by-name/detailed_test_fresh/start HTTP/1.1" 200 OK
+Task 742d57ce-fd9d-4d59-839e-679e7121d536: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 DEBUG: Adding user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 (detailed_test_fresh): 'Before you start, please prioritize finding any te...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 742d57ce-fd9d-4d59-839e-679e7121d536, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task detailed_test_fresh
+🔍 UserInputManager DEBUG: Current queue: None
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'timestamp': '2025-10-25T03:31:35.310285', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'timestamp': '2025-10-25T03:31:35.310285', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'timestamp': '2025-10-25T03:31:35.310285', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 with separate session
+🔄 Task detailed_test_fresh is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = None
+✅ Task executor restarted for detailed_test_fresh - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = None
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = None
+🔍 DEBUG: About to commit legacy field for task 742d57ce-fd9d-4d59-839e-679e7121d536
+✅ DEBUG: Legacy field commit completed for task 742d57ce-fd9d-4d59-839e-679e7121d536
+INFO:     127.0.0.1:50514 - "POST /api/v1/tasks/by-name/detailed_test_fresh/set-input HTTP/1.1" 200 OK
+Task 742d57ce-fd9d-4d59-839e-679e7121d536: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:50686 - "GET /api/v1/tasks/by-name/detailed_test_fresh/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51070 - "GET /api/v1/tasks/by-name/detailed_test_fresh/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51264 - "GET /api/v1/tasks/by-name/detailed_test_fresh/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51402 - "GET /api/v1/tasks/by-name/detailed_test_fresh/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51769 - "GET /api/v1/tasks/by-name/detailed_test_fresh/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51912 - "GET /api/v1/tasks/by-name/detailed_test_fresh/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52077 - "GET /api/v1/tasks/by-name/detailed_test_fresh/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52224 - "GET /api/v1/tasks/by-name/detailed_test_fresh/conversation HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=4d5d5286-dc98-4731-a5c2-586a60df617d
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=893ed831-0035-4590-89d7-56eaea73d7b2
+INFO:     127.0.0.1:52340 - "GET /api/v1/tasks/by-name/detailed_test_fresh/input-queue-status HTTP/1.1" 200 OK
+🔍 DEBUG: Adding user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 (detailed_test_fresh): 'Message 1: How are you doing?...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 742d57ce-fd9d-4d59-839e-679e7121d536, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task detailed_test_fresh
+🔍 UserInputManager DEBUG: Current queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'timestamp': '2025-10-25T03:33:01.717235', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'timestamp': '2025-10-25T03:33:01.717235', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'timestamp': '2025-10-25T03:33:01.717235', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 with separate session
+🔄 Task detailed_test_fresh is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}]
+✅ Task executor restarted for detailed_test_fresh - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}]
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}]
+🔍 DEBUG: About to commit legacy field for task 742d57ce-fd9d-4d59-839e-679e7121d536
+✅ DEBUG: Legacy field commit completed for task 742d57ce-fd9d-4d59-839e-679e7121d536
+INFO:     127.0.0.1:52696 - "POST /api/v1/tasks/by-name/detailed_test_fresh/set-input HTTP/1.1" 200 OK
+Task 742d57ce-fd9d-4d59-839e-679e7121d536: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 DEBUG: Adding user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 (detailed_test_fresh): 'Message 2: Can you count to 5?...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 742d57ce-fd9d-4d59-839e-679e7121d536, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task detailed_test_fresh
+🔍 UserInputManager DEBUG: Current queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'timestamp': '2025-10-25T03:33:06.488536', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'timestamp': '2025-10-25T03:33:06.488536', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'timestamp': '2025-10-25T03:33:06.488536', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 with separate session
+🔄 Task detailed_test_fresh is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}]
+✅ Task executor restarted for detailed_test_fresh - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}]
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}]
+🔍 DEBUG: About to commit legacy field for task 742d57ce-fd9d-4d59-839e-679e7121d536
+✅ DEBUG: Legacy field commit completed for task 742d57ce-fd9d-4d59-839e-679e7121d536
+INFO:     127.0.0.1:52866 - "POST /api/v1/tasks/by-name/detailed_test_fresh/set-input HTTP/1.1" 200 OK
+Task 742d57ce-fd9d-4d59-839e-679e7121d536: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 DEBUG: Adding user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 (detailed_test_fresh): 'Message 3: What is 2+2?...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 742d57ce-fd9d-4d59-839e-679e7121d536, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task detailed_test_fresh
+🔍 UserInputManager DEBUG: Current queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': '1c9168be-7628-4a23-8d14-d507cd689468', 'input': 'Message 3: What is 2+2?', 'timestamp': '2025-10-25T03:33:10.959242', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}, {'id': '1c9168be-7628-4a23-8d14-d507cd689468', 'input': 'Message 3: What is 2+2?', 'timestamp': '2025-10-25T03:33:10.959242', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}, {'id': '1c9168be-7628-4a23-8d14-d507cd689468', 'input': 'Message 3: What is 2+2?', 'timestamp': '2025-10-25T03:33:10.959242', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}, {'id': '1c9168be-7628-4a23-8d14-d507cd689468', 'input': 'Message 3: What is 2+2?', 'processed': False, 'timestamp': '2025-10-25T03:33:10.959242'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 742d57ce-fd9d-4d59-839e-679e7121d536 with separate session
+🔄 Task detailed_test_fresh is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}]
+✅ Task executor restarted for detailed_test_fresh - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}]
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': 'ef5746c0-b66d-4b87-8804-8750ecf08c2c', 'input': 'Before you start, please prioritize finding any test files first', 'processed': False, 'timestamp': '2025-10-25T03:31:35.310285'}, {'id': '57d8748b-f1fe-430c-b435-610a0db96fe1', 'input': 'Message 1: How are you doing?', 'processed': False, 'timestamp': '2025-10-25T03:33:01.717235'}, {'id': 'ba508fb4-a15d-487a-a0d4-d1bc27ba1df1', 'input': 'Message 2: Can you count to 5?', 'processed': False, 'timestamp': '2025-10-25T03:33:06.488536'}]
+🔍 DEBUG: About to commit legacy field for task 742d57ce-fd9d-4d59-839e-679e7121d536
+✅ DEBUG: Legacy field commit completed for task 742d57ce-fd9d-4d59-839e-679e7121d536
+INFO:     127.0.0.1:53064 - "POST /api/v1/tasks/by-name/detailed_test_fresh/set-input HTTP/1.1" 200 OK
+Task 742d57ce-fd9d-4d59-839e-679e7121d536: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:53312 - "GET /api/v1/tasks/by-name/detailed_test_fresh/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53722 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53858 - "POST /api/v1/tasks/by-name/simple_pause_test/start HTTP/1.1" 200 OK
+Task d1a70eb9-9956-4015-b4f4-9002b05d1313: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 TASK EXECUTOR DEBUG: task_id=d1a70eb9-9956-4015-b4f4-9002b05d1313, set claude_session_id=b513c214-3413-4e5c-9c4b-113534ccde84
+INFO:     127.0.0.1:54403 - "GET /api/v1/tasks/by-name/simple_pause_test/conversation HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=893ed831-0035-4590-89d7-56eaea73d7b2
+INFO:     127.0.0.1:54620 - "GET /api/v1/tasks/by-name/simple_pause_test/status HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=4d5d5286-dc98-4731-a5c2-586a60df617d
+🔍 TASK EXECUTOR DEBUG: task_id=d1a70eb9-9956-4015-b4f4-9002b05d1313, set claude_session_id=b513c214-3413-4e5c-9c4b-113534ccde84
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=893ed831-0035-4590-89d7-56eaea73d7b2
+🔍 DEBUG: Adding user input to queue for task d1a70eb9-9956-4015-b4f4-9002b05d1313 (simple_pause_test): 'I love Python because it is simple and powerful...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task d1a70eb9-9956-4015-b4f4-9002b05d1313, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task simple_pause_test
+🔍 UserInputManager DEBUG: Current queue: None
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'timestamp': '2025-10-25T03:34:08.660000', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'timestamp': '2025-10-25T03:34:08.660000', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'timestamp': '2025-10-25T03:34:08.660000', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task d1a70eb9-9956-4015-b4f4-9002b05d1313 with separate session
+🔄 Task simple_pause_test is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = None
+✅ Task executor restarted for simple_pause_test - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = None
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = None
+🔍 DEBUG: About to commit legacy field for task d1a70eb9-9956-4015-b4f4-9002b05d1313
+✅ DEBUG: Legacy field commit completed for task d1a70eb9-9956-4015-b4f4-9002b05d1313
+INFO:     127.0.0.1:54852 - "POST /api/v1/tasks/by-name/simple_pause_test/set-input HTTP/1.1" 200 OK
+Task d1a70eb9-9956-4015-b4f4-9002b05d1313: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=893ed831-0035-4590-89d7-56eaea73d7b2
+🔍 TASK EXECUTOR DEBUG: task_id=742d57ce-fd9d-4d59-839e-679e7121d536, set claude_session_id=4d5d5286-dc98-4731-a5c2-586a60df617d
+🔍 TASK EXECUTOR DEBUG: task_id=d1a70eb9-9956-4015-b4f4-9002b05d1313, set claude_session_id=b513c214-3413-4e5c-9c4b-113534ccde84
+INFO:     127.0.0.1:55472 - "GET /api/v1/tasks/by-name/simple_pause_test/conversation HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=d1a70eb9-9956-4015-b4f4-9002b05d1313, set claude_session_id=b513c214-3413-4e5c-9c4b-113534ccde84
+INFO:     127.0.0.1:55812 - "GET /api/v1/tasks/by-name/simple_pause_test/conversation HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+🔍 TASK EXECUTOR DEBUG: task_id=8d71a584-a288-4993-bca2-c445249c7d1a, set claude_session_id=332f0cd7-fd60-4a8e-a948-aee3cbc5b061
+🔍 DEBUG: Adding user input to queue for task d1a70eb9-9956-4015-b4f4-9002b05d1313 (simple_pause_test): 'PERSISTENCE TEST: This message should survive serv...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task d1a70eb9-9956-4015-b4f4-9002b05d1313, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task simple_pause_test
+🔍 UserInputManager DEBUG: Current queue: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'cd4a928a-7933-4c2d-abc1-09e329237889', 'input': 'PERSISTENCE TEST: This message should survive server restart', 'timestamp': '2025-10-25T03:34:49.277393', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}, {'id': 'cd4a928a-7933-4c2d-abc1-09e329237889', 'input': 'PERSISTENCE TEST: This message should survive server restart', 'timestamp': '2025-10-25T03:34:49.277393', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}, {'id': 'cd4a928a-7933-4c2d-abc1-09e329237889', 'input': 'PERSISTENCE TEST: This message should survive server restart', 'timestamp': '2025-10-25T03:34:49.277393', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}, {'id': 'cd4a928a-7933-4c2d-abc1-09e329237889', 'input': 'PERSISTENCE TEST: This message should survive server restart', 'processed': False, 'timestamp': '2025-10-25T03:34:49.277393'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task d1a70eb9-9956-4015-b4f4-9002b05d1313 with separate session
+🔄 Task simple_pause_test is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}]
+✅ Task executor restarted for simple_pause_test - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}]
+🔍 DEBUG: After UserInputManager commit and refresh - task.user_input_queue = [{'id': '284ec0f1-3bf6-4563-9041-57094bcf7a4d', 'input': 'I love Python because it is simple and powerful', 'processed': False, 'timestamp': '2025-10-25T03:34:08.660000'}]
+🔍 DEBUG: About to commit legacy field for task d1a70eb9-9956-4015-b4f4-9002b05d1313
+✅ DEBUG: Legacy field commit completed for task d1a70eb9-9956-4015-b4f4-9002b05d1313
+INFO:     127.0.0.1:56243 - "POST /api/v1/tasks/by-name/simple_pause_test/set-input HTTP/1.1" 200 OK
+Task d1a70eb9-9956-4015-b4f4-9002b05d1313: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:56410 - "GET /api/v1/tasks/by-name/simple_pause_test/input-queue-status HTTP/1.1" 200 OK

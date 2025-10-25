@@ -1,0 +1,96 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [83077]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:61376 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61430 - "POST /api/v1/tasks/by-name/final_dedup_test/start HTTP/1.1" 200 OK
+Task a100bfea-7dbb-4139-bb79-5e5373b0d15a: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 TASK EXECUTOR DEBUG: task_id=a100bfea-7dbb-4139-bb79-5e5373b0d15a, set claude_session_id=501b6a3e-e152-42de-89eb-a709145e0643
+🔍 DEBUG: Adding user input to queue for task a100bfea-7dbb-4139-bb79-5e5373b0d15a (final_dedup_test): 'Please work correctly...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task a100bfea-7dbb-4139-bb79-5e5373b0d15a, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task final_dedup_test
+🔍 UserInputManager DEBUG: Current queue: None
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'timestamp': '2025-10-25T04:24:46.104259', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'timestamp': '2025-10-25T04:24:46.104259', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'timestamp': '2025-10-25T04:24:46.104259', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task a100bfea-7dbb-4139-bb79-5e5373b0d15a with separate session
+🔍 DEBUG: After UserInputManager commit - fresh query shows task.user_input_queue = [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}]
+🔍 DEBUG: About to commit legacy field for task a100bfea-7dbb-4139-bb79-5e5373b0d15a
+✅ DEBUG: Legacy field commit completed for task a100bfea-7dbb-4139-bb79-5e5373b0d15a
+INFO:     127.0.0.1:61527 - "POST /api/v1/tasks/by-name/final_dedup_test/set-input HTTP/1.1" 200 OK
+🔍 TASK EXECUTOR DEBUG: task_id=a100bfea-7dbb-4139-bb79-5e5373b0d15a, set claude_session_id=501b6a3e-e152-42de-89eb-a709145e0643
+INFO:     127.0.0.1:61797 - "GET /api/v1/tasks/by-name/final_dedup_test/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61936 - "POST /api/v1/tasks/by-name/final_dedup_test/stop HTTP/1.1" 200 OK
+🔍 DEBUG: Adding user input to queue for task a100bfea-7dbb-4139-bb79-5e5373b0d15a (final_dedup_test): 'Test restart scenario...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task a100bfea-7dbb-4139-bb79-5e5373b0d15a, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task final_dedup_test
+🔍 UserInputManager DEBUG: Current queue: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': '7536ecc5-4253-49a1-89e5-0f4729e1d7a6', 'input': 'Test restart scenario', 'timestamp': '2025-10-25T04:25:28.463041', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}, {'id': '7536ecc5-4253-49a1-89e5-0f4729e1d7a6', 'input': 'Test restart scenario', 'timestamp': '2025-10-25T04:25:28.463041', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}, {'id': '7536ecc5-4253-49a1-89e5-0f4729e1d7a6', 'input': 'Test restart scenario', 'timestamp': '2025-10-25T04:25:28.463041', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}, {'id': '7536ecc5-4253-49a1-89e5-0f4729e1d7a6', 'input': 'Test restart scenario', 'processed': False, 'timestamp': '2025-10-25T04:25:28.463041'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task a100bfea-7dbb-4139-bb79-5e5373b0d15a with separate session
+🔍 DEBUG: After UserInputManager commit - fresh query shows task.user_input_queue = [{'id': 'efe3a840-e73a-498f-a7a8-70b0ff8a912e', 'input': 'Please work correctly', 'processed': False, 'timestamp': '2025-10-25T04:24:46.104259'}, {'id': '7536ecc5-4253-49a1-89e5-0f4729e1d7a6', 'input': 'Test restart scenario', 'processed': False, 'timestamp': '2025-10-25T04:25:28.463041'}]
+🔍 DEBUG: About to commit legacy field for task a100bfea-7dbb-4139-bb79-5e5373b0d15a
+✅ DEBUG: Legacy field commit completed for task a100bfea-7dbb-4139-bb79-5e5373b0d15a
+INFO:     127.0.0.1:61988 - "POST /api/v1/tasks/by-name/final_dedup_test/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62046 - "POST /api/v1/tasks/by-name/final_dedup_test/start HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:62108 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62158 - "POST /api/v1/tasks/by-name/restart_debug_test/start HTTP/1.1" 200 OK
+Task 8bd9eb0a-d61b-4a0c-957b-118f53295fef: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 TASK EXECUTOR DEBUG: task_id=8bd9eb0a-d61b-4a0c-957b-118f53295fef, set claude_session_id=fa2db81d-0c60-4d70-abe8-9cfd397387f9
+🔍 TASK EXECUTOR DEBUG: task_id=8bd9eb0a-d61b-4a0c-957b-118f53295fef, set claude_session_id=fa2db81d-0c60-4d70-abe8-9cfd397387f9
+🔍 DEBUG: Adding user input to queue for task 8bd9eb0a-d61b-4a0c-957b-118f53295fef (restart_debug_test): 'Debug the restart issue...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 8bd9eb0a-d61b-4a0c-957b-118f53295fef, use_separate_session=True
+🔍 UserInputManager DEBUG: Using separate database session
+🔍 UserInputManager DEBUG: Found task restart_debug_test
+🔍 UserInputManager DEBUG: Current queue: None
+🔍 UserInputManager DEBUG: Initialized empty queue
+🔍 UserInputManager DEBUG: Created input entry: {'id': '55233af7-c5e6-4747-b105-d21c91a4c71c', 'input': 'Debug the restart issue', 'timestamp': '2025-10-25T04:25:59.273908', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: []
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '55233af7-c5e6-4747-b105-d21c91a4c71c', 'input': 'Debug the restart issue', 'timestamp': '2025-10-25T04:25:59.273908', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '55233af7-c5e6-4747-b105-d21c91a4c71c', 'input': 'Debug the restart issue', 'timestamp': '2025-10-25T04:25:59.273908', 'processed': False}] and flagged as modified
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 UserInputManager DEBUG: Post-commit verification - database shows queue: [{'id': '55233af7-c5e6-4747-b105-d21c91a4c71c', 'input': 'Debug the restart issue', 'processed': False, 'timestamp': '2025-10-25T04:25:59.273908'}]
+🔍 UserInputManager DEBUG: Closed separate database session
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8bd9eb0a-d61b-4a0c-957b-118f53295fef with separate session
+🔄 Task restart_debug_test is RUNNING but no active process - restarting task executor to process user input
+🔍 DEBUG: Before task executor restart - task.user_input_queue = None
+✅ Task executor restarted for restart_debug_test - user input will be processed by task executor
+🔍 DEBUG: After task executor restart - task.user_input_queue = None
+🔍 DEBUG: After UserInputManager commit - fresh query shows task.user_input_queue = [{'id': '55233af7-c5e6-4747-b105-d21c91a4c71c', 'input': 'Debug the restart issue', 'processed': False, 'timestamp': '2025-10-25T04:25:59.273908'}]
+🔍 DEBUG: About to commit legacy field for task 8bd9eb0a-d61b-4a0c-957b-118f53295fef
+✅ DEBUG: Legacy field commit completed for task 8bd9eb0a-d61b-4a0c-957b-118f53295fef
+INFO:     127.0.0.1:62388 - "POST /api/v1/tasks/by-name/restart_debug_test/set-input HTTP/1.1" 200 OK
+Task 8bd9eb0a-d61b-4a0c-957b-118f53295fef: No worktree configured, using fallback path: /tmp/claude_projects
+🔍 RESTART DEBUG: Checking for pending user input for task 8bd9eb0a-d61b-4a0c-957b-118f53295fef
+🔍 RESTART DEBUG: get_next_user_input returned: Debug the restart issue
+🔍 RESTART DEBUG: Processing pending user input on restart: Debug the restart issue...
+🔍 RESTART DEBUG: Set user input as first message for restart
+🔍 TASK EXECUTOR DEBUG: task_id=8bd9eb0a-d61b-4a0c-957b-118f53295fef, set claude_session_id=fa2db81d-0c60-4d70-abe8-9cfd397387f9
+INFO:     127.0.0.1:63182 - "GET /api/v1/tasks/by-name/restart_debug_test/input-queue-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63360 - "GET /api/v1/tasks/by-name/restart_debug_test/conversation HTTP/1.1" 200 OK

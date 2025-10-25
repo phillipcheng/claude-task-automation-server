@@ -1,0 +1,881 @@
+import asyncio
+from typing import List, Dict, Optional
+from sqlalchemy.orm import Session as DBSession
+from app.database import SessionLocal
+from app.models import (
+    Task,
+    TaskStatus,
+    ClaudeInteraction,
+    InteractionType,
+    TestCase,
+    TestCaseType,
+    TestCaseStatus,
+    Session,
+)
+from app.services.streaming_cli_client import StreamingCLIClient
+from app.services.simulated_human import SimulatedHuman
+from app.services.intelligent_responder import IntelligentResponder
+from app.services.test_runner import TestRunner
+from app.services.criteria_analyzer import CriteriaAnalyzer
+from datetime import datetime
+import re
+import os
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class TaskExecutor:
+    """Executes tasks asynchronously with Claude CLI interaction."""
+
+    def __init__(self, cli_command: str = None):
+        # Use environment variable or default to "claude"
+        cli_cmd = cli_command or os.getenv("CLAUDE_CLI_COMMAND", "claude")
+        # Only use streaming client now - it has session support and no timeouts
+        self.streaming_client = StreamingCLIClient(cli_command=cli_cmd)
+        self.simulated_human = SimulatedHuman()
+        self.intelligent_responder = IntelligentResponder()
+        self.test_runner = TestRunner()
+        self.criteria_analyzer = CriteriaAnalyzer(cli_command=cli_cmd)
+        self.max_iterations = 20
+        self.max_pauses = 5
+
+    async def execute_task(self, task_id: str):
+        """
+        Execute a task asynchronously.
+
+        Args:
+            task_id: ID of the task to execute
+        """
+        db = SessionLocal()
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return
+
+            # Update task status (only if not stopped)
+            task.status = TaskStatus.RUNNING
+            db.commit()
+
+            # Get session for project context
+            session = db.query(Session).filter(Session.id == task.session_id).first()
+
+            # Handle multi-project tasks with multiple worktrees
+            if hasattr(task, 'projects') and task.projects:
+                # Multi-project task: Use the main project's worktree as primary working directory
+                # Additional project worktrees are available through relative paths
+                project_path = self._get_primary_project_path(task, session)
+                logger.info(f"Task {task.id}: Multi-project task using primary path: {project_path}")
+
+                # Validate all project worktrees are accessible
+                validation_result = self._validate_multi_project_worktrees(task)
+                if not validation_result["success"]:
+                    task.status = TaskStatus.FAILED
+                    task.error_message = validation_result["error"]
+                    db.commit()
+                    return
+
+            elif task.worktree_path:
+                # Single-project task with worktree isolation
+                # Validate that worktree path exists and is a valid directory
+                import os
+                if not os.path.exists(task.worktree_path) or not os.path.isdir(task.worktree_path):
+                    logger.error(f"Task {task.id}: Worktree path {task.worktree_path} does not exist or is not a directory")
+                    task.status = TaskStatus.FAILED
+                    task.error_message = f"Worktree path not found: {task.worktree_path}"
+                    db.commit()
+                    return
+                project_path = task.worktree_path
+
+                # Additional validation: verify the worktree is on the correct branch
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ["git", "branch", "--show-current"],
+                        cwd=project_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    current_branch = result.stdout.strip()
+                    if task.branch_name and current_branch != task.branch_name:
+                        logger.error(f"Task {task.id}: Worktree branch mismatch. Expected: {task.branch_name}, Current: {current_branch}")
+                        task.status = TaskStatus.FAILED
+                        task.error_message = f"Branch mismatch in worktree. Expected: {task.branch_name}, Current: {current_branch}"
+                        db.commit()
+                        return
+                    logger.info(f"Task {task.id}: Using worktree path for isolation: {project_path} (branch: {current_branch})")
+                except Exception as e:
+                    logger.warning(f"Task {task.id}: Could not verify branch in worktree: {e}")
+            else:
+                # Fallback to root_folder or session path for tasks without worktrees
+                project_path = task.root_folder or (session.project_path if session else ".")
+                logger.warning(f"Task {task.id}: No worktree configured, using fallback path: {project_path}")
+
+            # Execute the task with Claude
+            await self._execute_with_claude(db, task, project_path)
+
+        except Exception as e:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if task:
+                task.status = TaskStatus.FAILED
+                task.error_message = str(e)
+                db.commit()
+        finally:
+            db.close()
+
+    async def _execute_with_claude(self, db: DBSession, task: Task, project_path: str):
+        """
+        Execute task with Claude CLI, handling conversation and pauses.
+
+        Args:
+            db: Database session
+            task: Task to execute
+            project_path: Path to the project
+        """
+        iteration = 0
+        pause_count = 0
+        is_first_message = True
+
+        # Get ending criteria configuration
+        end_criteria_config = task.end_criteria_config or {}
+        ending_criteria = end_criteria_config.get("criteria")
+        max_iterations = end_criteria_config.get("max_iterations", self.max_iterations)
+        max_tokens = end_criteria_config.get("max_tokens")
+
+        # Track cumulative tokens
+        if task.total_tokens_used is None:
+            task.total_tokens_used = 0
+            db.commit()
+
+        # Get project context (using simple file-based fallback)
+        # CRITICAL: Only provide the working directory path to Claude (worktree for isolation)
+        # Never expose the main repository path to prevent cross-branch contamination
+        project_context = self._get_project_context(project_path, task)
+
+        # Initial user request (keep concise to avoid CLI hanging)
+        initial_message = f"""Task: {task.description}
+
+{project_context}
+
+Please implement this task. You have permissions for file operations and testing. When complete, provide a summary."""
+
+        # Save initial interaction
+        self._save_interaction(
+            db, task.id, InteractionType.USER_REQUEST, initial_message
+        )
+
+        last_response = ""
+        conversation_history = []  # Track conversation for criteria checking
+
+        while iteration < max_iterations:
+            iteration += 1
+
+            # Check if task was stopped
+            db.refresh(task)
+            if task.status == TaskStatus.STOPPED:
+                break
+
+            # Check if max tokens limit reached
+            if max_tokens and task.total_tokens_used >= max_tokens:
+                task.status = TaskStatus.EXHAUSTED
+                task.error_message = f"Max tokens limit reached: {task.total_tokens_used}/{max_tokens} tokens used"
+                db.commit()
+                break
+
+            try:
+                # Send message to Claude CLI
+                if is_first_message:
+                    message_to_send = initial_message
+                    is_first_message = False
+                else:
+                    # Check if we should continue based on last response
+                    if not self.intelligent_responder.should_continue_conversation(
+                        last_response, iteration, self.max_iterations
+                    ):
+                        break
+
+                    # Use intelligent responder to generate context-aware reply
+                    if pause_count < self.max_pauses:
+                        task.status = TaskStatus.PAUSED
+                        db.commit()
+
+                        # Wait a bit to simulate human thinking
+                        await asyncio.sleep(1)
+
+                        # Check if user provided custom input (human-in-the-loop)
+                        db.refresh(task)  # Refresh to get latest custom_human_input
+                        if task.custom_human_input:
+                            # Use custom input instead of auto-generated
+                            human_prompt = task.custom_human_input
+
+                            # Clear the custom input after using it
+                            task.custom_human_input = None
+                            db.commit()
+
+                            # Save as REAL human interaction
+                            self._save_interaction(
+                                db, task.id, InteractionType.USER_REQUEST, human_prompt
+                            )
+                        else:
+                            # Generate intelligent response based on Claude's output
+                            human_prompt = self.intelligent_responder.generate_response(
+                                claude_response=last_response,
+                                task_description=task.description,
+                                iteration=iteration
+                            )
+
+                            # Save simulated human interaction
+                            self._save_interaction(
+                                db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt
+                            )
+
+                        message_to_send = human_prompt
+
+                        task.status = TaskStatus.RUNNING
+                        db.commit()
+                        pause_count += 1
+                    else:
+                        # Max pauses reached, stop
+                        break
+
+                # Get Claude's response via CLI (using streaming client)
+                # Save events to DB in real-time as they arrive
+                def handle_event(event: dict):
+                    """Process and save stream events in real-time."""
+                    event_type = event.get('type')
+
+                    # Save assistant messages (Claude's responses)
+                    if event_type == 'assistant':
+                        message_data = event.get('message', {})
+                        content = message_data.get('content', [])
+
+                        # Extract text and tool uses from content
+                        text_parts = []
+                        tool_uses = []
+                        for block in content:
+                            if block.get('type') == 'text':
+                                text_parts.append(block.get('text', ''))
+                            elif block.get('type') == 'tool_use':
+                                tool_uses.append(block)
+
+                        # Save as interaction if there's text or tool use
+                        if text_parts or tool_uses:
+                            content_str = '\n'.join(text_parts) if text_parts else f"[Tool use: {len(tool_uses)} tools]"
+                            self._save_interaction(
+                                db, task.id, InteractionType.CLAUDE_RESPONSE, content_str
+                            )
+
+                    # Save user messages (tool results)
+                    elif event_type == 'user':
+                        message_data = event.get('message', {})
+                        content = message_data.get('content', [])
+
+                        # Extract tool results
+                        tool_results = []
+                        for block in content:
+                            if block.get('type') == 'tool_result':
+                                tool_id = block.get('tool_use_id', 'unknown')
+                                is_error = block.get('is_error', False)
+                                result_content = block.get('content', [])
+
+                                # Collect all text from result content blocks
+                                result_texts = []
+                                for result_block in result_content:
+                                    if isinstance(result_block, dict) and result_block.get('type') == 'text':
+                                        result_texts.append(result_block.get('text', ''))
+                                    elif isinstance(result_block, str):
+                                        # Sometimes content is just a string
+                                        result_texts.append(result_block)
+
+                                # Join with empty string instead of newlines to fix vertical text issue
+                                full_result_text = ''.join(result_texts)
+
+                                # Format the tool result with tool_id and full content
+                                if is_error:
+                                    tool_results.append(f"Tool {tool_id} ERROR:\n{full_result_text}")
+                                else:
+                                    tool_results.append(f"Tool {tool_id}:\n{full_result_text}")
+
+                        if tool_results:
+                            self._save_interaction(
+                                db, task.id, InteractionType.TOOL_RESULT, '\n\n'.join(tool_results)
+                            )
+
+                # Use streaming client with event callback for real-time DB saves
+                response, pid, returned_session_id, usage_data = await self.streaming_client.send_message_streaming(
+                    message=message_to_send,
+                    project_path=project_path,
+                    output_callback=None,
+                    session_id=task.claude_session_id,  # Pass existing session_id or None for first message
+                    event_callback=handle_event,  # Process events in real-time
+                )
+
+                # Store PID and session_id for process management and conversation continuity
+                task.process_pid = pid
+                if returned_session_id:
+                    task.claude_session_id = returned_session_id
+                db.commit()
+
+                # Track cumulative output tokens from usage data
+                if usage_data and 'usage' in usage_data:
+                    output_tokens = usage_data['usage'].get('output_tokens', 0)
+                    task.total_tokens_used = (task.total_tokens_used or 0) + output_tokens
+                    db.commit()
+
+                # Note: We no longer save the final response here since interactions
+                # are saved in real-time via the event_callback
+
+                # Store for next iteration
+                last_response = response
+                conversation_history.append(response)
+
+                # Check if task meets ending criteria (if defined)
+                criteria_met = False
+                if ending_criteria:
+                    try:
+                        # Check if ending criteria is met
+                        criteria_met, reasoning = await self.criteria_analyzer.check_task_completion(
+                            ending_criteria=ending_criteria,
+                            task_description=task.description,
+                            conversation_history="\n\n".join(conversation_history[-3:]),  # Last 3 responses
+                            latest_response=last_response
+                        )
+
+                        if criteria_met:
+                            task.summary = f"Task completed - Criteria met: {reasoning}"
+                            task.status = TaskStatus.FINISHED
+                            db.commit()
+                            break
+                    except Exception as e:
+                        print(f"Error checking ending criteria: {e}")
+
+                # Fallback: Check if task seems complete using old heuristic
+                if not criteria_met and self._is_task_complete(response):
+                    task.summary = self._extract_summary(response)
+                    db.commit()
+                    break
+
+            except Exception as e:
+                task.error_message = f"Error during execution: {str(e)}"
+                db.commit()
+                break
+
+        # Check if loop ended due to hitting max iterations
+        if iteration >= max_iterations and task.status == TaskStatus.RUNNING:
+            # Max iterations reached without completing
+            task.status = TaskStatus.EXHAUSTED
+            task.error_message = f"Max iterations limit reached: {iteration}/{max_iterations} iterations completed without meeting ending criteria"
+            db.commit()
+
+        # If no summary yet, try to extract from last response
+        if not task.summary:
+            # Get last Claude response
+            last_responses = [i for i in db.query(ClaudeInteraction).filter(
+                ClaudeInteraction.task_id == task.id,
+                ClaudeInteraction.interaction_type == InteractionType.CLAUDE_RESPONSE
+            ).all()]
+            if last_responses:
+                task.summary = self._extract_summary(last_responses[-1].content)
+                db.commit()
+
+        # Generate and run tests
+        await self._generate_and_run_tests(db, task, project_path)
+
+    def _get_project_context(self, project_path: str, task) -> str:
+        """
+        Get context about the project structure for Claude.
+
+        CRITICAL: This function must NOT expose absolute paths to the main repository.
+        Claude should only know about the current working directory (worktree for isolated tasks).
+
+        Args:
+            project_path: Path to the working directory (worktree for isolated tasks)
+            task: Task object to determine if we're in an isolated worktree
+
+        Returns:
+            Project context string that only references the current working directory
+        """
+        import os
+
+        # CRITICAL: Never expose absolute paths that could leak main repository location
+        # Claude should only work within the current working directory
+
+        # Handle multi-project mode
+        if hasattr(task, 'projects') and task.projects:
+            context = "Multi-Project Environment:\n"
+            context += "You are working on a task that involves multiple projects.\n\n"
+
+            # For isolated tasks (worktrees), only mention current working directory
+            if hasattr(task, 'worktree_path') and task.worktree_path and task.branch_name:
+                context += f"Main Working Directory: Current directory (isolated branch: {task.branch_name})\n"
+                context += f"Task Branch: {task.branch_name}\n"
+                context += "You are working in a task-specific isolated environment.\n\n"
+
+            context += "Project Configuration:\n"
+            for i, project in enumerate(task.projects, 1):
+                project_context = project.get('context', 'No context provided')
+                access = project.get('access', 'write')
+                branch = project.get('branch_name', 'default')
+
+                context += f"{i}. {project_context}\n"
+                context += f"   - Access: {access}\n"
+                if access == "write":
+                    context += f"   - Branch: {branch} (isolated worktree)\n"
+                else:
+                    context += f"   - Read-only access\n"
+                context += "\n"
+
+            context += "Important Notes:\n"
+            context += "- Projects with 'write' access are isolated in separate worktrees\n"
+            context += "- Projects with 'read' access are for reference only\n"
+            context += "- Use relative paths for all file operations\n"
+            context += "- Your changes will only affect the isolated worktree branches\n\n"
+
+        else:
+            # Single project mode
+            # For isolated tasks (worktrees), only mention current working directory
+            if hasattr(task, 'worktree_path') and task.worktree_path and task.branch_name:
+                context = f"Working Directory: Current directory (isolated branch: {task.branch_name})\n"
+                context += f"Task Branch: {task.branch_name}\n"
+                context += "You are working in a task-specific isolated environment.\n"
+            else:
+                # Fallback for non-isolated tasks - still avoid absolute path exposure
+                context = "Working Directory: Current directory\n"
+
+        # Add project architecture information
+        # Priority: 1. User-specified project context, 2. Automatic detection, 3. None
+        if hasattr(task, 'project_context') and task.project_context:
+            # User provided explicit project context - use that
+            context += f"\nProject Context:\n{task.project_context}\n"
+        elif not (hasattr(task, 'projects') and task.projects):
+            # Only do automatic detection for single-project mode (multi-project has explicit context)
+            project_info = self._detect_project_info(project_path)
+            if project_info:
+                context += f"\nProject Architecture:\n{project_info}"
+
+        try:
+            if os.path.exists(project_path):
+                # Just indicate directory exists - Claude can explore using relative paths
+                context += "\nThe working directory exists and you have full access to explore it.\n"
+                context += "Use relative paths for all file operations to ensure proper isolation.\n"
+
+                # Check for specific project structure
+                test_dir = os.path.join(project_path, "test")
+                if os.path.exists(test_dir):
+                    context += "- Found ./test directory with regression test cases\n"
+
+                go_mod = os.path.join(project_path, "go.mod")
+                if os.path.exists(go_mod):
+                    context += "- Found go.mod file (Go module project)\n"
+
+            else:
+                context += "Note: Working directory does not exist yet.\n"
+        except Exception as e:
+            context += f"Error reading working directory: {str(e)}\n"
+
+        return context
+
+    def _detect_project_info(self, project_path: str) -> str:
+        """
+        Dynamically detect project information based on files and structure.
+        Returns project context string that can be added to prompts.
+        """
+        import os
+        import json
+
+        if not os.path.exists(project_path):
+            return ""
+
+        info_lines = []
+
+        try:
+            # Detect project type and language
+            project_type = self._detect_project_type(project_path)
+            if project_type:
+                info_lines.append(f"- {project_type}")
+
+            # Look for configuration files that might give hints about dependencies
+            dependencies = self._detect_dependencies(project_path)
+            if dependencies:
+                info_lines.extend(dependencies)
+
+            # Check for test directories and mention testing setup
+            test_info = self._detect_test_structure(project_path)
+            if test_info:
+                info_lines.extend(test_info)
+
+            # Look for project configuration files
+            config_info = self._detect_project_config(project_path)
+            if config_info:
+                info_lines.extend(config_info)
+
+        except Exception as e:
+            # If detection fails, don't break the whole system
+            logger.warning(f"Project detection failed: {e}")
+            return ""
+
+        if info_lines:
+            return "\n".join(info_lines) + "\n- When making changes, consider impact on project structure and existing functionality\n"
+
+        return ""
+
+    def _detect_project_type(self, project_path: str) -> str:
+        """Detect the project type based on key files."""
+        import os
+
+        # Go project
+        if os.path.exists(os.path.join(project_path, "go.mod")):
+            return "Go project (detected go.mod)"
+
+        # Python project
+        if any(os.path.exists(os.path.join(project_path, f)) for f in ["setup.py", "pyproject.toml", "requirements.txt"]):
+            return "Python project"
+
+        # Node.js project
+        if os.path.exists(os.path.join(project_path, "package.json")):
+            return "Node.js project (detected package.json)"
+
+        # Java project
+        if any(os.path.exists(os.path.join(project_path, f)) for f in ["pom.xml", "build.gradle"]):
+            return "Java project"
+
+        # Rust project
+        if os.path.exists(os.path.join(project_path, "Cargo.toml")):
+            return "Rust project (detected Cargo.toml)"
+
+        # C/C++ project
+        if any(os.path.exists(os.path.join(project_path, f)) for f in ["Makefile", "CMakeLists.txt"]):
+            return "C/C++ project"
+
+        return ""
+
+    def _detect_dependencies(self, project_path: str) -> list:
+        """Detect project dependencies based on configuration files."""
+        import os
+        import json
+
+        deps = []
+
+        # Go dependencies
+        go_mod_path = os.path.join(project_path, "go.mod")
+        if os.path.exists(go_mod_path):
+            try:
+                with open(go_mod_path, 'r') as f:
+                    content = f.read()
+                    # Look for SDK patterns in go.mod
+                    if "sdk" in content.lower():
+                        deps.append("- Dependencies: Uses SDK modules (detected in go.mod)")
+                    elif "require" in content:
+                        deps.append("- Dependencies: Uses Go modules (see go.mod)")
+            except Exception:
+                pass
+
+        # Node.js dependencies
+        package_json_path = os.path.join(project_path, "package.json")
+        if os.path.exists(package_json_path):
+            try:
+                with open(package_json_path, 'r') as f:
+                    package_data = json.load(f)
+                    if package_data.get("dependencies") or package_data.get("devDependencies"):
+                        deps.append("- Dependencies: Uses npm packages (see package.json)")
+            except Exception:
+                pass
+
+        # Python dependencies
+        if os.path.exists(os.path.join(project_path, "requirements.txt")):
+            deps.append("- Dependencies: Uses Python packages (see requirements.txt)")
+
+        return deps
+
+    def _detect_test_structure(self, project_path: str) -> list:
+        """Detect testing structure and configuration."""
+        import os
+
+        test_info = []
+
+        # Look for common test directories
+        test_dirs = ["test", "tests", "__tests__", "spec"]
+        for test_dir in test_dirs:
+            test_path = os.path.join(project_path, test_dir)
+            if os.path.exists(test_path) and os.path.isdir(test_path):
+                test_info.append(f"- Testing: ./{test_dir} directory contains test cases")
+                break
+
+        # Look for test configuration files
+        test_configs = {
+            "pytest.ini": "pytest configuration",
+            "jest.config.js": "Jest configuration",
+            "go.test": "Go test setup",
+            "phpunit.xml": "PHPUnit configuration"
+        }
+
+        for config_file, description in test_configs.items():
+            if os.path.exists(os.path.join(project_path, config_file)):
+                test_info.append(f"- Testing: {description} found")
+
+        return test_info
+
+    def _detect_project_config(self, project_path: str) -> list:
+        """Detect project configuration files."""
+        import os
+
+        config_info = []
+
+        # Common configuration files
+        configs = {
+            ".env": "Environment configuration",
+            "docker-compose.yml": "Docker composition setup",
+            "Dockerfile": "Docker containerization",
+            "README.md": "Project documentation available",
+            "Makefile": "Build automation with Make"
+        }
+
+        for config_file, description in configs.items():
+            if os.path.exists(os.path.join(project_path, config_file)):
+                config_info.append(f"- Configuration: {description}")
+
+        return config_info
+
+    def _save_interaction(
+        self, db: DBSession, task_id: str, interaction_type: InteractionType, content: str, usage_data: Optional[Dict] = None
+    ):
+        """Save an interaction to the database with optional usage data."""
+        interaction = ClaudeInteraction(
+            task_id=task_id, interaction_type=interaction_type, content=content
+        )
+
+        # Add usage data if available (from Claude CLI result event)
+        if usage_data:
+            interaction.duration_ms = usage_data.get('duration_ms')
+            interaction.cost_usd = usage_data.get('cost_usd')
+
+            usage = usage_data.get('usage', {})
+            interaction.input_tokens = usage.get('input_tokens')
+            interaction.output_tokens = usage.get('output_tokens')
+            interaction.cache_creation_tokens = usage.get('cache_creation_input_tokens')
+            interaction.cache_read_tokens = usage.get('cache_read_input_tokens')
+
+        db.add(interaction)
+        db.commit()
+
+    def _is_task_complete(self, response: str) -> bool:
+        """
+        Determine if the task is complete based on Claude's response.
+
+        Args:
+            response: Claude's response
+
+        Returns:
+            True if task appears complete
+        """
+        completion_indicators = [
+            "implementation is complete",
+            "task is complete",
+            "finished implementing",
+            "implementation done",
+            "completed the task",
+            "all done",
+            "implementation summary",
+            "successfully implemented",
+        ]
+
+        response_lower = response.lower()
+        return any(indicator in response_lower for indicator in completion_indicators)
+
+    def _extract_summary(self, response: str) -> str:
+        """
+        Extract a summary from Claude's response.
+
+        Args:
+            response: Claude's response
+
+        Returns:
+            Extracted summary
+        """
+        # Try to find summary section
+        summary_patterns = [
+            r"(?i)summary:?\s*(.+?)(?:\n\n|\Z)",
+            r"(?i)implementation summary:?\s*(.+?)(?:\n\n|\Z)",
+            r"(?i)what (?:i've|i have) done:?\s*(.+?)(?:\n\n|\Z)",
+        ]
+
+        for pattern in summary_patterns:
+            match = re.search(pattern, response, re.DOTALL)
+            if match:
+                return match.group(1).strip()[:500]  # Limit to 500 chars
+
+        # If no summary found, take first 300 characters
+        return response[:300] + "..." if len(response) > 300 else response
+
+    async def _generate_and_run_tests(
+        self,
+        db: DBSession,
+        task: Task,
+        project_path: str,
+    ):
+        """
+        Generate test cases and run them.
+
+        Args:
+            db: Database session
+            task: Task object
+            project_path: Path to the project
+        """
+        task.status = TaskStatus.TESTING
+        db.commit()
+
+        try:
+            # Generate test cases using Claude CLI (with streaming client and session continuity)
+            test_message = f"""Based on the following implementation, generate comprehensive pytest test cases.
+
+Task: {task.description}
+
+Implementation Summary: {task.summary or "Task implementation"}
+
+Please generate pytest test cases that thoroughly test this implementation.
+Create the test file in the appropriate location in the project.
+Return the test code you created."""
+
+            # Use streaming client with session continuity (continues conversation from main task)
+            test_code, pid, returned_session_id, usage_data = await self.streaming_client.send_message_streaming(
+                message=test_message,
+                project_path=project_path,
+                session_id=task.claude_session_id,  # Continue the same conversation
+            )
+
+            # Update session_id if changed
+            if returned_session_id:
+                task.claude_session_id = returned_session_id
+            task.process_pid = pid
+            db.commit()
+
+            # Save test generation interaction with usage data
+            self._save_interaction(
+                db, task.id, InteractionType.CLAUDE_RESPONSE, test_code, usage_data
+            )
+
+            # Validate test code
+            is_valid, error_msg = await self.test_runner.validate_test_code(test_code)
+
+            if is_valid:
+                # Create test case record
+                test_case = TestCase(
+                    task_id=task.id,
+                    name=f"Generated test for: {task.description[:50]}",
+                    description="Auto-generated test case",
+                    test_code=test_code,
+                    test_type=TestCaseType.GENERATED,
+                    status=TestCaseStatus.PENDING,
+                )
+                db.add(test_case)
+                db.commit()
+
+                # Run the test
+                success, output = await self.test_runner.run_test(test_code, project_path)
+
+                test_case.status = TestCaseStatus.PASSED if success else TestCaseStatus.FAILED
+                test_case.output = output
+                db.commit()
+
+            # Run regression tests if they exist
+            regression_passed, regression_output, _ = await self.test_runner.run_regression_tests(
+                project_path
+            )
+
+            # Determine final task status
+            all_tests_passed = (
+                is_valid
+                and all(tc.status == TestCaseStatus.PASSED for tc in task.test_cases)
+                and regression_passed
+            )
+
+            if all_tests_passed:
+                task.status = TaskStatus.COMPLETED
+                task.completed_at = datetime.utcnow()
+            else:
+                task.status = TaskStatus.FAILED
+                task.error_message = "Some tests failed"
+
+            db.commit()
+
+        except Exception as e:
+            task.status = TaskStatus.FAILED
+            task.error_message = f"Error during testing: {str(e)}"
+            db.commit()
+
+    def _get_primary_project_path(self, task, session) -> str:
+        """
+        Get the primary project path for multi-project tasks.
+        This is where Claude CLI will be executed from.
+
+        Args:
+            task: Task object with projects configuration
+            session: Session object with fallback path
+
+        Returns:
+            Path to the primary project working directory
+        """
+        # For multi-project tasks, use the main project's worktree if available
+        if task.worktree_path:
+            return task.worktree_path
+
+        # Otherwise, use the first project's path
+        if task.projects and len(task.projects) > 0:
+            primary_project = task.projects[0]
+            primary_path = primary_project.get("path")
+            if primary_path:
+                return primary_path
+
+        # Fallback to task root_folder or session path
+        return task.root_folder or (session.project_path if session else ".")
+
+    def _validate_multi_project_worktrees(self, task) -> Dict[str, any]:
+        """
+        Validate that all project worktrees are accessible for multi-project tasks.
+
+        Args:
+            task: Task object with projects configuration
+
+        Returns:
+            Dict with 'success' boolean and optional 'error' message
+        """
+        import os
+
+        # For multi-project tasks, validate all write-access projects have proper isolation
+        write_projects = [p for p in task.projects if p.get("access") == "write"]
+
+        for project in write_projects:
+            project_path = project.get("path")
+            if not project_path:
+                continue
+
+            if not os.path.exists(project_path) or not os.path.isdir(project_path):
+                return {
+                    "success": False,
+                    "error": f"Multi-project worktree path not found: {project_path}"
+                }
+
+            # Verify git worktree for write-access projects
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["git", "rev-parse", "--is-inside-work-tree"],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode != 0:
+                    return {
+                        "success": False,
+                        "error": f"Project path is not a git worktree: {project_path}"
+                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Could not validate git worktree for {project_path}: {e}"
+                }
+
+        return {"success": True}

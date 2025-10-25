@@ -1,0 +1,29 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [23126]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+🔍 DEBUG: Adding user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a (add_scene_event_codes_to_stra): 'FINAL TEST: Does the fix work now?...'
+🔍 UserInputManager DEBUG: Starting add_user_input for task 8d71a584-a288-4993-bca2-c445249c7d1a
+🔍 UserInputManager DEBUG: Found task add_scene_event_codes_to_stra
+🔍 UserInputManager DEBUG: Current queue: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}]
+🔍 UserInputManager DEBUG: Created input entry: {'id': 'fef501b8-7fd2-4899-bad0-4bb1ea4787fb', 'input': 'FINAL TEST: Does the fix work now?', 'timestamp': '2025-10-25T03:13:41.708326', 'processed': False}
+🔍 UserInputManager DEBUG: Current queue before append: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}]
+🔍 UserInputManager DEBUG: Current queue after append: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'fef501b8-7fd2-4899-bad0-4bb1ea4787fb', 'input': 'FINAL TEST: Does the fix work now?', 'timestamp': '2025-10-25T03:13:41.708326', 'processed': False}]
+🔍 UserInputManager DEBUG: Set task.user_input_queue to: [{'id': '5e11131f-3a38-4d66-8fb3-b1ec2d136dfe', 'input': 'do not forget test case', 'processed': False, 'timestamp': '2025-10-24T23:24:16.184454'}, {'id': 'fef501b8-7fd2-4899-bad0-4bb1ea4787fb', 'input': 'FINAL TEST: Does the fix work now?', 'timestamp': '2025-10-25T03:13:41.708326', 'processed': False}]
+🔍 UserInputManager DEBUG: About to commit...
+✅ UserInputManager DEBUG: Commit successful
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a
+🔄 Task add_scene_event_codes_to_stra is RUNNING but no active process - restarting task executor to process user input
+✅ Task executor restarted for add_scene_event_codes_to_stra - user input will be processed by task executor
+🔍 DEBUG: Set legacy field and committed for task 8d71a584-a288-4993-bca2-c445249c7d1a
+INFO:     127.0.0.1:64040 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64154 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK

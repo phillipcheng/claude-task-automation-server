@@ -1,0 +1,124 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [7505]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:63611 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63613 - "POST /api/v1/tasks/by-name/immediate_test_1761353025/start HTTP/1.1" 200 OK
+Task b0de9528-7675-43a5-9b91-a32c2c8a507e: No worktree configured, using fallback path: /tmp/immediate_test
+Working directory does not exist: /tmp/immediate_test
+INFO:     127.0.0.1:63616 - "GET /api/v1/tasks/b0de9528-7675-43a5-9b91-a32c2c8a507e/status HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/applications.py", line 1133, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 123, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 109, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 389, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 288, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/app/api/endpoints.py", line 1636, in get_task_status
+    process_running=process_running,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'process_running' is not defined
+INFO:     127.0.0.1:63797 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63797 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63797 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63797 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63797 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64397 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+🔍 IMMEDIATE PROCESSING DEBUG: task_id=8d71a584-a288-4993-bca2-c445249c7d1a, claude_session_id=None
+⚠️  No claude_session_id available yet for task 8d71a584-a288-4993-bca2-c445249c7d1a, proceeding without session continuity
+INFO:     127.0.0.1:64397 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64411 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64547 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64651 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64893 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64893 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64893 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65035 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65203 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65311 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65405 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK

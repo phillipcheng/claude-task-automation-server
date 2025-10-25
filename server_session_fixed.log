@@ -1,0 +1,542 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [97542]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:58352 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58485 - "POST /api/v1/tasks/by-name/session_fix_test/start HTTP/1.1" 200 OK
+Task b0ee07b4-63da-4a2d-bc57-e3b3327ce851: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:58880 - "POST /api/v1/tasks/by-name/session_fix_test/set-input HTTP/1.1" 422 Unprocessable Content
+Claude CLI executing in current directory (no project_path specified)
+🔍 IMMEDIATE PROCESSING DEBUG: task_id=b0ee07b4-63da-4a2d-bc57-e3b3327ce851, claude_session_id=None
+⚠️  No claude_session_id available yet for task b0ee07b4-63da-4a2d-bc57-e3b3327ce851, proceeding without session continuity
+INFO:     127.0.0.1:59170 - "POST /api/v1/tasks/by-name/session_fix_test/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59864 - "GET /api/v1/tasks/by-name/session_fix_test/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60921 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/clear-and-restart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60921 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60921 - "GET /api/v1/tasks/by-name/session_fix_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60929 - "GET /api/v1/tasks/by-name/final_session_debug/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60931 - "GET /api/v1/tasks/by-name/session_tracking_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60933 - "GET /api/v1/tasks/by-name/session_debug_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60935 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60936 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61134 - "DELETE /api/v1/tasks/by-name/session_fix_test HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61134 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61134 - "GET /api/v1/tasks/by-name/persistence_test_task/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "GET /api/v1/tasks/by-name/final_session_debug/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61141 - "GET /api/v1/tasks/by-name/session_debug_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61139 - "GET /api/v1/tasks/by-name/session_tracking_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61144 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/app/services/task_executor.py", line 336, in _execute_with_claude
+    response, pid, returned_session_id, usage_data = await self.streaming_client.send_message_streaming(
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/app/services/streaming_cli_client.py", line 98, in send_message_streaming
+    event_callback(event)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/bytedance/python/claudeserver/app/services/task_executor.py", line 296, in handle_event
+    db, task.id, InteractionType.CLAUDE_RESPONSE, content_str
+        ^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/attributes.py", line 569, in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/attributes.py", line 1096, in get
+    value = self._fire_loader_callables(state, key, passive)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/attributes.py", line 1126, in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/state.py", line 803, in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/loading.py", line 1686, in load_scalar_attributes
+    raise orm_exc.ObjectDeletedError(state)
+sqlalchemy.orm.exc.ObjectDeletedError: Instance '<Task at 0x10a6e9310>' has been deleted, or its row is otherwise not present.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/app/services/task_executor.py", line 119, in execute_task
+    await self._execute_with_claude(db, task, project_path)
+  File "/Users/bytedance/python/claudeserver/app/services/task_executor.py", line 397, in _execute_with_claude
+    db.commit()
+    ~~~~~~~~~^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1311, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1286, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4331, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4427, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 85, in save_obj
+    _emit_update_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        update,
+        ^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 781, in _emit_update_statements
+    ) in groupby(
+         ~~~~~~~^
+        update,
+        ^^^^^^^
+    ...<6 lines>...
+        ),
+        ^^
+    ):
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 577, in _collect_update_commands
+    history = state.manager[propkey].impl.get_history(
+        state, state_dict, attributes.PASSIVE_OFF
+    )
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/attributes.py", line 1265, in get_history
+    current = self.get(state, dict_, passive=passive)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/attributes.py", line 1096, in get
+    value = self._fire_loader_callables(state, key, passive)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/attributes.py", line 1126, in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/state.py", line 803, in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/loading.py", line 1686, in load_scalar_attributes
+    raise orm_exc.ObjectDeletedError(state)
+sqlalchemy.orm.exc.ObjectDeletedError: Instance '<Task at 0x10a6e9310>' has been deleted, or its row is otherwise not present.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/applications.py", line 1133, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 123, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 110, in app
+    await response(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/responses.py", line 168, in __call__
+    await self.background()
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/background.py", line 42, in __call__
+    await task()
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/background.py", line 27, in __call__
+    await self.func(*self.args, **self.kwargs)
+  File "/Users/bytedance/python/claudeserver/app/services/task_executor.py", line 122, in execute_task
+    task = db.query(Task).filter(Task.id == task_id).first()
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/query.py", line 2759, in first
+    return self.limit(1)._iter().first()  # type: ignore
+           ~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+        params,
+        ^^^^^^^
+        execution_options={"_sa_orm_load_options": self.load_options},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        statement,
+        ^^^^^^^^^^
+    ...<4 lines>...
+        _add_event=_add_event,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 101, in _go
+    self._raise_for_prerequisite_state(fn.__name__, current_state)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 971, in _raise_for_prerequisite_state
+    raise sa_exc.PendingRollbackError(
+    ...<6 lines>...
+    )
+sqlalchemy.exc.PendingRollbackError: This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback(). Original exception was: Instance '<Task at 0x10a6e9310>' has been deleted, or its row is otherwise not present. (Background on this error at: https://sqlalche.me/e/20/7s2a)
+INFO:     127.0.0.1:61144 - "DELETE /api/v1/tasks/by-name/persistence_test_task HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61144 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61144 - "GET /api/v1/tasks/by-name/final_session_debug/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/session_tracking_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61141 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61139 - "GET /api/v1/tasks/by-name/session_debug_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61139 - "DELETE /api/v1/tasks/by-name/final_session_debug HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61139 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61139 - "GET /api/v1/tasks/by-name/session_tracking_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "GET /api/v1/tasks/by-name/session_debug_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61141 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61141 - "DELETE /api/v1/tasks/by-name/session_tracking_test HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61141 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61141 - "GET /api/v1/tasks/by-name/session_debug_test/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "DELETE /api/v1/tasks/by-name/session_debug_test HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "GET /api/v1/tasks?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61137 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/live_demo/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62090 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62158 - "POST /api/v1/prompts HTTP/1.1" 201 Created
+INFO:     127.0.0.1:62216 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62158 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+🔍 IMMEDIATE PROCESSING DEBUG: task_id=8d71a584-a288-4993-bca2-c445249c7d1a, claude_session_id=None
+⚠️  No claude_session_id available yet for task 8d71a584-a288-4993-bca2-c445249c7d1a, proceeding without session continuity
+INFO:     127.0.0.1:62158 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62158 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62406 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62408 - "POST /api/v1/tasks/4e8c0a2a-5089-47db-89df-d8c4c4452662/start HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62537 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62644 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62703 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62818 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63066 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63068 - "POST /api/v1/tasks/by-name/immediate_test_1761352982/start HTTP/1.1" 200 OK
+Task ff28d461-d0d7-431e-ae58-8ce8939a6cff: No worktree configured, using fallback path: /tmp/immediate_test
+Working directory does not exist: /tmp/immediate_test
+INFO:     127.0.0.1:63070 - "GET /api/v1/tasks/ff28d461-d0d7-431e-ae58-8ce8939a6cff/status HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/applications.py", line 1133, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 123, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 109, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 389, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 288, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/app/api/endpoints.py", line 1636, in get_task_status
+    process_running=process_running,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'process_running' is not defined
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62916 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63217 - "GET /api/v1/tasks/ff28d461-d0d7-431e-ae58-8ce8939a6cff/status HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/applications.py", line 1133, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 123, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 109, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 389, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 288, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/app/api/endpoints.py", line 1636, in get_task_status
+    process_running=process_running,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'process_running' is not defined
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63244 - "GET /api/v1/tasks/ff28d461-d0d7-431e-ae58-8ce8939a6cff/status HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/applications.py", line 1133, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 123, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 109, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 389, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/bytedance/python/claudeserver/venv/lib/python3.13/site-packages/fastapi/routing.py", line 288, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bytedance/python/claudeserver/app/api/endpoints.py", line 1636, in get_task_status
+    process_running=process_running,
+                    ^^^^^^^^^^^^^^^
+NameError: name 'process_running' is not defined
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63192 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/conversation HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)
+Background message sending failed: Claude CLI error (exit code -15): Unknown error
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [97542]

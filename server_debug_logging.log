@@ -1,0 +1,20 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [17763]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:61700 - "GET /health HTTP/1.1" 200 OK
+🔍 DEBUG: Adding user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a (add_scene_event_codes_to_stra): 'DEBUG TEST: Can you see this message with the new ...'
+🔍 DEBUG: UserInputManager.add_user_input() returned: True
+✅ DEBUG: Successfully added user input to queue for task 8d71a584-a288-4993-bca2-c445249c7d1a
+🔄 Task add_scene_event_codes_to_stra is RUNNING but no active process - restarting task executor to process user input
+✅ Task executor restarted for add_scene_event_codes_to_stra - user input will be processed by task executor
+INFO:     127.0.0.1:61791 - "POST /api/v1/tasks/by-name/add_scene_event_codes_to_stra/set-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62050 - "GET /api/v1/tasks/by-name/add_scene_event_codes_to_stra/input-queue-status HTTP/1.1" 200 OK

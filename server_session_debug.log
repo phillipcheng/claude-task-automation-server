@@ -1,0 +1,19 @@
+/Users/bytedance/python/claudeserver/app/main.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [90643]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Database initialized: mysql+pymysql://root:sitebuilder@localhost/claudesys
+INFO:     127.0.0.1:55072 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55115 - "POST /api/v1/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55194 - "POST /api/v1/tasks/by-name/session_tracking_test/start HTTP/1.1" 200 OK
+Task 672e513d-fdc8-4a25-bdd2-30aa0d2b083f: No worktree configured, using fallback path: /tmp/claude_projects
+INFO:     127.0.0.1:55641 - "GET /api/v1/tasks/by-name/session_tracking_test/status HTTP/1.1" 200 OK
+Claude CLI executing in current directory (no project_path specified)
+INFO:     127.0.0.1:55765 - "POST /api/v1/tasks/by-name/session_tracking_test/set-input HTTP/1.1" 200 OK
