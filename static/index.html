@@ -32,7 +32,7 @@
 
         /* Only restrict overflow for tabs view */
         body.tabs-view {
-            overflow: hidden;
+            overflow: auto;
         }
 
         .container {
@@ -4969,6 +4969,12 @@
                         taskContent.scrollTop = 0;
                         console.log('Also scrolled taskContent to top to show tabs');
                     }
+
+                    // Also scroll the main window/body to the very top to show Add Task buttons
+                    window.scrollTo(0, 0);
+                    document.body.scrollTop = 0;
+                    document.documentElement.scrollTop = 0;
+                    console.log('Also scrolled main window to top to show Add Task buttons');
                 } else {
                     // For other items, scroll to their position (not centering)
                     scrollPosition = targetTop;
