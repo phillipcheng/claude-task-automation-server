@@ -61,12 +61,31 @@ class UserInputManager:
                 task.user_input_queue = []
                 print(f"🔍 UserInputManager DEBUG: Initialized empty queue")
 
+            # Check for recent duplicates to prevent spam (same logic as REST endpoint)
+            from datetime import timedelta
+            current_queue = task.user_input_queue or []
+            recent_cutoff = datetime.utcnow() - timedelta(seconds=30)  # 30 second window
+
+            for entry in current_queue:
+                try:
+                    entry_time = datetime.fromisoformat(entry.get("timestamp", "1970-01-01T00:00:00"))
+                    entry_input = entry.get("input", "")
+                    if entry_time > recent_cutoff and entry_input == user_input:
+                        print(f"🚫 UserInputManager DUPLICATE BLOCKED: '{user_input[:50]}...' was already sent within 30 seconds")
+                        if use_separate_session:
+                            separate_db.close()
+                        return False  # Duplicate detected, don't add
+                except Exception as e:
+                    print(f"⚠️ UserInputManager WARNING: Error parsing timestamp in queue entry: {e}")
+                    continue
+
             # Create new input entry
             input_entry = {
                 "id": str(uuid.uuid4()),
                 "input": user_input,
                 "timestamp": datetime.utcnow().isoformat(),
-                "processed": False
+                "status": "pending",  # pending -> sent -> processed
+                "processed": False  # Keep for backward compatibility
             }
             print(f"🔍 UserInputManager DEBUG: Created input entry: {input_entry}")
 
@@ -130,9 +149,95 @@ class UserInputManager:
         return task.user_input_pending and task.user_input_queue
 
     @staticmethod
+    def get_next_pending_user_input(db: Session, task_id: str) -> Optional[str]:
+        """
+        Get the next PENDING user input from the queue (not sent yet).
+        This prevents duplicate processing by only returning unsent messages.
+
+        Args:
+            db: Database session
+            task_id: ID of the task
+
+        Returns:
+            The next pending user input message, or None if no pending input
+        """
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task or not task.user_input_queue:
+                return None
+
+            # Get current queue
+            current_queue = task.user_input_queue or []
+
+            # Find first pending input (status="pending", not "sent" or "processed")
+            for entry in current_queue:
+                status = entry.get("status", "pending")  # Default to pending for backward compatibility
+                if status == "pending":
+                    print(f"📤 Found pending message: {entry['input'][:50]}...")
+                    return entry["input"]
+
+            print(f"📤 No pending messages found for task {task_id}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get pending user input for task {task_id}: {e}")
+            return None
+
+    @staticmethod
+    def mark_message_as_sent(db: Session, task_id: str, user_input: str) -> bool:
+        """
+        Mark a specific message as 'sent' to prevent duplicate processing.
+
+        Args:
+            db: Database session
+            task_id: ID of the task
+            user_input: The message that was sent
+
+        Returns:
+            True if message was found and marked as sent
+        """
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task or not task.user_input_queue:
+                return False
+
+            # Get current queue
+            current_queue = task.user_input_queue or []
+            updated_queue = []
+            message_found = False
+
+            for entry in current_queue:
+                if entry["input"] == user_input and entry.get("status", "pending") == "pending":
+                    # Mark this message as sent
+                    entry["status"] = "sent"
+                    entry["sent_at"] = datetime.utcnow().isoformat()
+                    message_found = True
+                    print(f"📤 Marked message as SENT: {user_input[:50]}...")
+
+                updated_queue.append(entry)
+
+            if message_found:
+                # Update the queue
+                task.user_input_queue = updated_queue
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(task, 'user_input_queue')
+                db.commit()
+                print(f"✅ Successfully marked message as sent for task {task_id}")
+                return True
+            else:
+                print(f"⚠️ Message not found in pending queue for task {task_id}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to mark message as sent for task {task_id}: {e}")
+            db.rollback()
+            return False
+
+    @staticmethod
     def get_next_user_input(db: Session, task_id: str) -> Optional[str]:
         """
         Get the next user input from the queue and mark it as processed.
+        DEPRECATED: Use get_next_pending_user_input() + mark_message_as_sent() instead.
 
         Args:
             db: Database session
@@ -291,6 +396,10 @@ class UserInputManager:
                 logger.error(f"Failed to save user interaction for immediate processing")
                 return False
 
+            # CRITICAL: Mark the message as "sent" to prevent duplicate processing
+            if not UserInputManager.mark_message_as_sent(db, task_id, user_input):
+                logger.warning(f"Failed to mark message as sent for immediate processing - may cause duplicates")
+
             # Create streaming client to send message to Claude immediately
             cli_cmd = os.getenv("CLAUDE_CLI_COMMAND", "claude")
             streaming_client = StreamingCLIClient(cli_command=cli_cmd)
@@ -389,6 +498,30 @@ class UserInputManager:
             thread.start()
 
             logger.info(f"Triggered immediate processing for task {task_id}: {user_input[:50]}...")
+
+            # CRITICAL: After starting immediate processing, schedule flag reset
+            # so that task executor doesn't skip processing when it restarts
+            def reset_flag_after_processing():
+                import time
+                time.sleep(3)  # Give immediate processing time to complete
+                try:
+                    from app.database import SessionLocal
+                    reset_db = SessionLocal()
+                    try:
+                        reset_task = reset_db.query(Task).filter(Task.id == task_id).first()
+                        if reset_task and reset_task.immediate_processing_active:
+                            reset_task.immediate_processing_active = False
+                            reset_db.commit()
+                            print(f"🔄 Auto-reset immediate_processing_active=False for task {task_id} after processing")
+                    finally:
+                        reset_db.close()
+                except Exception as e:
+                    print(f"❌ Failed to reset immediate_processing_active for task {task_id}: {e}")
+
+            # Start reset thread
+            reset_thread = threading.Thread(target=reset_flag_after_processing, daemon=True)
+            reset_thread.start()
+
             return True
 
         except Exception as e:

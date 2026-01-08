@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from typing import List, Optional
 import asyncio
 import json
@@ -514,7 +515,41 @@ async def stop_task(task_name: str, db: Session = Depends(get_db)):
                 process_exists = False
 
             if process_exists:
-                # Try SIGTERM first for graceful shutdown
+                # Try to kill all child processes first
+                try:
+                    # On macOS, use ps and grep to find child processes
+                    import subprocess
+                    # Find all child processes of the parent PID
+                    ps_cmd = f"ps -o pid,ppid -ax | grep {task.process_pid}"
+                    result = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True)
+                    
+                    # Parse the output to find child PIDs
+                    child_pids = []
+                    for line in result.stdout.splitlines():
+                        parts = line.strip().split()
+                        if len(parts) >= 2:
+                            try:
+                                pid, ppid = int(parts[0]), int(parts[1])
+                                # If this process's parent is our target process
+                                if ppid == task.process_pid:
+                                    child_pids.append(pid)
+                            except ValueError:
+                                continue
+                    
+                    # Kill all child processes with SIGTERM first
+                    for child_pid in child_pids:
+                        try:
+                            print(f"Terminating child process {child_pid}")
+                            os.kill(child_pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass  # Child already gone
+                        except Exception as e:
+                            print(f"Error terminating child process {child_pid}: {e}")
+                
+                except Exception as e:
+                    print(f"Error finding child processes: {e}")
+                
+                # Try SIGTERM first for graceful shutdown of the parent
                 try:
                     os.kill(task.process_pid, signal.SIGTERM)
                     termination_method = "SIGTERM"
@@ -538,6 +573,16 @@ async def stop_task(task_name: str, db: Session = Depends(get_db)):
 
                             # Give SIGKILL a moment to take effect
                             await asyncio.sleep(0.1)
+                            
+                            # Also kill any remaining child processes with SIGKILL
+                            for child_pid in child_pids:
+                                try:
+                                    os.kill(child_pid, signal.SIGKILL)
+                                except ProcessLookupError:
+                                    pass  # Child already gone
+                                except Exception as e:
+                                    print(f"Error force-killing child process {child_pid}: {e}")
+                                    
                         except ProcessLookupError:
                             killed_process = True  # Process already gone
 
@@ -677,6 +722,10 @@ async def clear_and_restart_task(
     # Clear user input queue to ensure fresh start
     task.user_input_queue = None
     task.user_input_pending = False
+    task.custom_human_input = None  # Clear legacy user input field
+
+    # Clear Claude session ID to force a new conversation session
+    task.claude_session_id = None
 
     # Clean up and reinitiate git worktree and branch
     cleanup_messages = []
@@ -759,6 +808,10 @@ async def clear_and_restart_task(
     task.error_message = None  # Clear any previous error messages on restart
 
     db.commit()
+
+    # Add a brief delay to ensure database changes are visible to new sessions
+    import asyncio
+    await asyncio.sleep(0.1)  # 100ms delay
 
     # Start the task in background
     executor = TaskExecutor()
@@ -895,110 +948,9 @@ async def get_task_conversation(task_name: str, collapse_tools: bool = True, db:
     # Get all interactions ordered by creation time
     interactions = sorted(task.interactions, key=lambda x: x.created_at)
 
-    def collapse_consecutive_tool_results(interactions_list):
-        """Collapse consecutive tool operations (claude_response + tool_result) into groups."""
-        if not collapse_tools:
-            return [
-                {
-                    "id": interaction.id,
-                    "type": interaction.interaction_type.value,
-                    "content": interaction.content,
-                    "timestamp": interaction.created_at.isoformat()
-                }
-                for interaction in interactions_list
-                if interaction.content and interaction.content.strip()  # Filter out empty content
-            ]
-
-        collapsed = []
-        current_tool_group = None
-        i = 0
-
-        def is_tool_use_message(content):
-            """Check if a claude_response is just a tool use message."""
-            if not content:
-                return False
-            content_lower = content.lower().strip()
-            return (content_lower.startswith("[tool use:") or
-                    "tool use:" in content_lower or
-                    content_lower == "[tool use: 1 tools]" or
-                    content_lower.startswith("i'll") and "tool" in content_lower)
-
-        while i < len(interactions_list):
-            interaction = interactions_list[i]
-
-            # Check if this starts a tool operation sequence
-            if (interaction.interaction_type.value == "claude_response" and
-                is_tool_use_message(interaction.content)):
-
-                # This is a tool use message, start collecting the sequence
-                if current_tool_group is None:
-                    current_tool_group = {
-                        "id": f"tool_group_{interaction.id}",
-                        "type": "tool_group",
-                        "tool_count": 0,
-                        "first_timestamp": interaction.created_at.isoformat(),
-                        "last_timestamp": interaction.created_at.isoformat(),
-                        "summary": "",
-                        "tools": []
-                    }
-
-                # Collect all following tool_results
-                i += 1
-                while i < len(interactions_list) and interactions_list[i].interaction_type.value == "tool_result":
-                    tool_result = interactions_list[i]
-                    current_tool_group["tool_count"] += 1
-                    current_tool_group["last_timestamp"] = tool_result.created_at.isoformat()
-                    current_tool_group["tools"].append({
-                        "id": tool_result.id,
-                        "type": tool_result.interaction_type.value,
-                        "content": tool_result.content,
-                        "timestamp": tool_result.created_at.isoformat()
-                    })
-                    i += 1
-
-                # Update summary
-                current_tool_group["summary"] = f"Tool execution results ({current_tool_group['tool_count']} tools)"
-
-                # Don't increment i here since we already moved past the tool_results
-                continue
-
-            elif interaction.interaction_type.value == "tool_result" and current_tool_group is not None:
-                # Standalone tool_result that should be added to current group
-                current_tool_group["tool_count"] += 1
-                current_tool_group["last_timestamp"] = interaction.created_at.isoformat()
-                current_tool_group["summary"] = f"Tool execution results ({current_tool_group['tool_count']} tools)"
-                current_tool_group["tools"].append({
-                    "id": interaction.id,
-                    "type": interaction.interaction_type.value,
-                    "content": interaction.content,
-                    "timestamp": interaction.created_at.isoformat()
-                })
-            else:
-                # Non-tool interaction or meaningful claude_response
-                # Finalize any current tool group
-                if current_tool_group is not None:
-                    collapsed.append(current_tool_group)
-                    current_tool_group = None
-
-                # Add the meaningful interaction (skip empty/simulated human if needed)
-                if not (interaction.interaction_type.value == "simulated_human" and
-                       (not interaction.content or interaction.content.strip() == "")):
-                    collapsed.append({
-                        "id": interaction.id,
-                        "type": interaction.interaction_type.value,
-                        "content": interaction.content,
-                        "timestamp": interaction.created_at.isoformat()
-                    })
-
-            i += 1
-
-        # Don't forget to add the last tool group if it exists
-        if current_tool_group is not None:
-            collapsed.append(current_tool_group)
-
-        return collapsed
-
-    conversation = collapse_consecutive_tool_results(interactions)
+    # Use shared utility for consistent formatting
+    from app.utils.conversation_formatter import collapse_consecutive_tool_results
+    conversation = collapse_consecutive_tool_results(interactions, collapse_tools)
 
     return {
         "task_name": task.task_name,
@@ -1017,43 +969,70 @@ async def stream_task_conversation(task_name: str, db: Session = Depends(get_db)
     async def event_generator():
         """Generate SSE events with new interactions."""
         last_interaction_count = 0
+        is_initial_connection = True  # Flag to send existing messages on first connection
 
         while True:
-            # Refresh task to get latest status
-            db.refresh(task)
+            # Get current task status efficiently (single field query)
+            current_task = db.query(Task.status, Task.id).filter(Task.id == task.id).first()
+            if not current_task:
+                break
+            current_status = current_task.status
 
-            # Get all interactions
-            interactions = sorted(task.interactions, key=lambda x: x.created_at)
-            current_count = len(interactions)
+            # Get count of interactions efficiently
+            from app.models.interaction import ClaudeInteraction
+            current_count = db.query(ClaudeInteraction).filter(
+                ClaudeInteraction.task_id == task.id
+            ).count()
 
-            # Send new interactions
-            if current_count > last_interaction_count:
-                new_interactions = interactions[last_interaction_count:]
-                for interaction in new_interactions:
-                    data = {
-                        "id": interaction.id,
-                        "type": interaction.interaction_type.value,
-                        "content": interaction.content,
-                        "timestamp": interaction.created_at.isoformat()
-                    }
-                    yield f"data: {json.dumps(data)}\n\n"
+            # Send interactions: all existing on first connection, then only new ones
+            if current_count > last_interaction_count or is_initial_connection:
+                from app.utils.conversation_formatter import collapse_consecutive_tool_results
 
-                last_interaction_count = current_count
+                if is_initial_connection and current_count > 0:
+                    # Send ALL existing interactions on first connection with tool grouping
+                    all_interactions = db.query(ClaudeInteraction).filter(
+                        ClaudeInteraction.task_id == task.id
+                    ).order_by(ClaudeInteraction.created_at).all()
+
+                    # Apply the same tool grouping logic as conversation API
+                    formatted_interactions = collapse_consecutive_tool_results(all_interactions, collapse_tools=True)
+
+                    for data in formatted_interactions:
+                        yield f"data: {json.dumps(data)}\n\n"
+
+                    is_initial_connection = False
+                    last_interaction_count = current_count
+
+                elif current_count > last_interaction_count:
+                    # Get all interactions and format them, then compare with what we sent before
+                    all_interactions = db.query(ClaudeInteraction).filter(
+                        ClaudeInteraction.task_id == task.id
+                    ).order_by(ClaudeInteraction.created_at).all()
+
+                    # Apply the same tool grouping logic as conversation API
+                    formatted_interactions = collapse_consecutive_tool_results(all_interactions, collapse_tools=True)
+
+                    # For real-time streaming, we need to send ALL formatted messages
+                    # Frontend will handle deduplication by ID
+                    for data in formatted_interactions:
+                        yield f"data: {json.dumps(data)}\n\n"
+
+                    last_interaction_count = current_count
 
             # Send status update
             status_data = {
                 "type": "status",
-                "status": task.status.value,
+                "status": current_status.value,
                 "total_interactions": current_count
             }
             yield f"data: {json.dumps(status_data)}\n\n"
 
             # If task is in terminal state, stop streaming
-            if task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED]:
+            if current_status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED]:
                 break
 
-            # Wait before next check
-            await asyncio.sleep(1)
+            # Wait before next check (reduced for better responsiveness)
+            await asyncio.sleep(0.5)
 
     return StreamingResponse(
         event_generator(),
@@ -1086,6 +1065,26 @@ async def set_custom_human_input(
         raise HTTPException(status_code=400, detail="Missing 'input' field in request body")
 
     user_input = request["input"]
+
+    # Check for recent duplicate messages to prevent spam/repeated submissions
+    import time
+    from datetime import datetime, timedelta
+
+    # Get current queue to check for recent duplicates
+    current_queue = task.user_input_queue or []
+    recent_cutoff = datetime.utcnow() - timedelta(seconds=30)  # 30 second window
+
+    for entry in current_queue:
+        entry_time = datetime.fromisoformat(entry.get("timestamp", "1970-01-01T00:00:00"))
+        entry_input = entry.get("input", "")
+        if entry_time > recent_cutoff and entry_input == user_input:
+            print(f"🚫 DUPLICATE MESSAGE BLOCKED: '{user_input[:50]}...' was already sent within 30 seconds")
+            return {
+                "message": "Duplicate message blocked - same message was recently sent",
+                "task_name": task_name,
+                "input_preview": user_input[:100] + "..." if len(user_input) > 100 else user_input,
+                "blocked_reason": "DUPLICATE_MESSAGE_WITHIN_30_SECONDS"
+            }
 
     # Use new high-priority user input queue system
     # Use separate session to avoid transaction conflicts with endpoint session
@@ -1134,12 +1133,10 @@ async def set_custom_human_input(
             print(f"🚀 Immediate processing triggered: {immediate_success}")
             task_executor_restarted = False
 
-            # Mark the message as processed since it's being sent to Claude immediately
-            # This implements the rule: "as long as it is sent to Claude, it is processed"
+            # The message is already marked as "sent" by the immediate processing function
+            # so no additional deduplication is needed here
             if immediate_success:
-                processed_input = UserInputManager.get_next_user_input(db, task.id)
-                if processed_input:
-                    print(f"✅ Marked message as processed (immediate): {processed_input[:50]}...")
+                print(f"✅ Message successfully processed via immediate processing path")
 
         else:
             # No active process - restart executor as before

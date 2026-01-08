@@ -70,6 +70,9 @@ class Task(Base):
     # Quick flag to check if user input is pending (for performance)
     user_input_pending = Column(Boolean, default=False, nullable=False)
 
+    # Flag to prevent duplicate processing when immediate processing is active
+    immediate_processing_active = Column(Boolean, default=False, nullable=False)
+
     # Process tracking
     process_pid = Column(Integer, nullable=True)
 

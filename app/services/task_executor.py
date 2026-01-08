@@ -50,15 +50,20 @@ class TaskExecutor:
         Args:
             task_id: ID of the task to execute
         """
+        print(f"🔥 EXECUTE_TASK DEBUG: Starting execution for task {task_id}")
         db = SessionLocal()
         try:
             task = db.query(Task).filter(Task.id == task_id).first()
             if not task:
+                print(f"🔥 EXECUTE_TASK DEBUG: Task {task_id} not found")
                 return
+
+            print(f"🔥 EXECUTE_TASK DEBUG: Found task {task.task_name}, current status: {task.status}")
 
             # Update task status (only if not stopped)
             task.status = TaskStatus.RUNNING
             db.commit()
+            print(f"🔥 EXECUTE_TASK DEBUG: Updated task status to RUNNING")
 
             # Get session for project context
             session = db.query(Session).filter(Session.id == task.session_id).first()
@@ -112,8 +117,18 @@ class TaskExecutor:
                     logger.warning(f"Task {task.id}: Could not verify branch in worktree: {e}")
             else:
                 # Fallback to root_folder or session path for tasks without worktrees
-                project_path = task.root_folder or (session.project_path if session else ".")
-                logger.warning(f"Task {task.id}: No worktree configured, using fallback path: {project_path}")
+                # IMPORTANT FIX: Ensure we have a valid project path, not just "."
+                import os
+                if task.root_folder and os.path.exists(task.root_folder):
+                    project_path = task.root_folder
+                    logger.info(f"Task {task.id}: Using task root_folder as project path: {project_path}")
+                elif session and hasattr(session, 'project_path') and session.project_path and os.path.exists(session.project_path):
+                    project_path = session.project_path
+                    logger.info(f"Task {task.id}: Using session project_path: {project_path}")
+                else:
+                    # Last resort: Use current working directory, but this should be avoided
+                    project_path = "."
+                    logger.warning(f"Task {task.id}: No valid project path found, falling back to current directory (this may cause issues)")
 
             # Execute the task with Claude
             await self._execute_with_claude(db, task, project_path)
@@ -168,13 +183,19 @@ class TaskExecutor:
 
         # ALWAYS check for pending user input at startup (both new tasks and restarts)
         print(f"🔍 STARTUP DEBUG: Checking for pending user input for task {task.id}")
-        user_input = self.user_input_manager.get_next_user_input(db, task.id)
-        print(f"🔍 STARTUP DEBUG: get_next_user_input returned: {user_input}")
+
+        # Use new status-based deduplication: only process messages that haven't been sent yet
+        user_input = self.user_input_manager.get_next_pending_user_input(db, task.id)
+        print(f"🔍 STARTUP DEBUG: get_next_pending_user_input returned: {user_input}")
 
         if user_input:
             # User input takes priority - process it immediately
             print(f"🔍 STARTUP DEBUG: Found pending user input, processing: {user_input[:50]}...")
             logger.info(f"Task {task.id}: Processing pending user input at startup: {user_input[:50]}...")
+
+            # CRITICAL: Mark message as sent BEFORE sending to Claude to prevent duplicates
+            self.user_input_manager.mark_message_as_sent(db, task.id, user_input)
+
             # Save as USER_REQUEST interaction
             self._save_interaction(db, task.id, InteractionType.USER_REQUEST, user_input)
             # Use user input as the message to send
@@ -200,10 +221,12 @@ class TaskExecutor:
 
         while iteration < max_iterations:
             iteration += 1
+            print(f"🔥 TASK EXECUTOR DEBUG: Starting iteration {iteration} for task {task.id}")
 
             # Check if task was stopped
             db.refresh(task)
             if task.status == TaskStatus.STOPPED:
+                print(f"🔥 TASK EXECUTOR DEBUG: Task {task.id} was stopped, breaking")
                 break
 
             # Check if max tokens limit reached
@@ -248,13 +271,15 @@ class TaskExecutor:
 
                         logger.info(f"Task {task.id}: Checking for user input in pause cycle")
 
-                        # First, try the new queue system (high priority)
-                        user_input = self.user_input_manager.get_next_user_input(db, task.id)
+                        # Use new status-based deduplication: only process messages that haven't been sent yet
+                        user_input = self.user_input_manager.get_next_pending_user_input(db, task.id)
 
                         if user_input:
-                            logger.info(f"Task {task.id}: Found user input in queue: {user_input[:50]}...")
+                            logger.info(f"Task {task.id}: Found pending user input in queue: {user_input[:50]}...")
+                            # CRITICAL: Mark message as sent BEFORE sending to Claude to prevent duplicates
+                            self.user_input_manager.mark_message_as_sent(db, task.id, user_input)
                         else:
-                            logger.info(f"Task {task.id}: No user input found in queue")
+                            logger.info(f"Task {task.id}: No pending user input found in queue")
 
                         # Fallback to legacy custom_human_input for backward compatibility
                         if not user_input and task.custom_human_input:
@@ -301,11 +326,16 @@ class TaskExecutor:
                 def handle_event(event: dict):
                     """Process and save stream events in real-time."""
                     event_type = event.get('type')
+                    print(f"🔥 HANDLE_EVENT DEBUG: Received event type: {event_type}, event: {event}")
+                    logger.info(f"HANDLE_EVENT: Received event type: {event_type}")
 
                     # Save assistant messages (Claude's responses)
                     if event_type == 'assistant':
+                        print(f"🔥 HANDLE_EVENT DEBUG: Processing assistant event")
                         message_data = event.get('message', {})
                         content = message_data.get('content', [])
+                        print(f"🔥 HANDLE_EVENT DEBUG: message_data: {message_data}")
+                        print(f"🔥 HANDLE_EVENT DEBUG: content: {content}")
 
                         # Extract text and tool uses from content
                         text_parts = []
@@ -316,12 +346,19 @@ class TaskExecutor:
                             elif block.get('type') == 'tool_use':
                                 tool_uses.append(block)
 
+                        print(f"🔥 HANDLE_EVENT DEBUG: text_parts: {text_parts}")
+                        print(f"🔥 HANDLE_EVENT DEBUG: tool_uses: {tool_uses}")
+
                         # Save as interaction if there's text or tool use
                         if text_parts or tool_uses:
                             content_str = '\n'.join(text_parts) if text_parts else f"[Tool use: {len(tool_uses)} tools]"
+                            print(f"🔥 HANDLE_EVENT DEBUG: Saving interaction with content: {content_str[:100]}...")
                             self._save_interaction(
                                 db, task.id, InteractionType.CLAUDE_RESPONSE, content_str
                             )
+                            print(f"🔥 HANDLE_EVENT DEBUG: Interaction saved successfully")
+                        else:
+                            print(f"🔥 HANDLE_EVENT DEBUG: No text or tool use found, skipping interaction save")
 
                     # Save user messages (tool results)
                     elif event_type == 'user':
@@ -360,6 +397,11 @@ class TaskExecutor:
                             )
 
                 # Use streaming client with event callback for real-time DB saves
+                print(f"🔥 TASK EXECUTOR DEBUG: About to call streaming client for task {task.id}")
+                print(f"🔥 TASK EXECUTOR DEBUG: message_to_send: {message_to_send[:100]}...")
+                print(f"🔥 TASK EXECUTOR DEBUG: project_path: {project_path}")
+                print(f"🔥 TASK EXECUTOR DEBUG: session_id: {task.claude_session_id}")
+
                 response, pid, returned_session_id, usage_data = await self.streaming_client.send_message_streaming(
                     message=message_to_send,
                     project_path=project_path,
@@ -367,6 +409,9 @@ class TaskExecutor:
                     session_id=task.claude_session_id,  # Pass existing session_id or None for first message
                     event_callback=handle_event,  # Process events in real-time
                 )
+
+                print(f"🔥 TASK EXECUTOR DEBUG: Streaming client returned, response length: {len(response) if response else 0}")
+                print(f"🔥 TASK EXECUTOR DEBUG: PID: {pid}, session_id: {returned_session_id}")
 
                 # Store PID and session_id for process management and conversation continuity
                 task.process_pid = pid
@@ -581,6 +626,7 @@ class TaskExecutor:
         if hasattr(task, 'project_context') and task.project_context:
             # User provided explicit project context - use that
             context += f"\nProject Context:\n{task.project_context}\n"
+            context += "IMPORTANT: You are working in an isolated git worktree/task branch - all changes will be made to this branch only.\n"
         elif not (hasattr(task, 'projects') and task.projects):
             # Only do automatic detection for single-project mode (multi-project has explicit context)
             project_info = self._detect_project_info(project_path)
@@ -592,6 +638,7 @@ class TaskExecutor:
                 # Just indicate directory exists - Claude can explore using relative paths
                 context += "\nThe working directory exists and you have full access to explore it.\n"
                 context += "Use relative paths for all file operations to ensure proper isolation.\n"
+                context += "IMPORTANT: You are working in an isolated git worktree - any changes you make will be committed to your task branch only.\n"
 
                 # Check for specific project structure
                 test_dir = os.path.join(project_path, "test")
@@ -649,7 +696,7 @@ class TaskExecutor:
             return ""
 
         if info_lines:
-            return "\n".join(info_lines) + "\n- When making changes, consider impact on project structure and existing functionality\n"
+            return "\n".join(info_lines) + "\n- When making changes, consider impact on project structure and existing functionality\n- IMPORTANT: You are working in an isolated git worktree/task branch - all changes will be made to this branch only\n- All file modifications will automatically be committed to your task branch and will not affect the main branch\n"
 
         return ""
 

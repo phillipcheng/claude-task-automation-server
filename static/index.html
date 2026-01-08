@@ -6,8 +6,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Cache buster: Force reload - 20251023-v2 -->
-    <title>Phillip Task Automation Server - v20251023-v2</title>
+    <!-- Cache buster: Force reload - 20251027-streaming-realtime-fix -->
+    <title>Phillip Task Automation Server - v20251027-streaming-realtime-fix</title>
 
     <!-- Favicon and Icons -->
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -161,6 +161,76 @@
 
         .tasks-list {
             margin-top: 20px;
+        }
+
+        /* Batch selection styles */
+        .batch-selection-toolbar {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .batch-selection-toolbar.visible {
+            display: flex;
+        }
+
+        .batch-selection-info {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .batch-actions .btn {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .select-all-container {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .select-all-container label {
+            margin: 0;
+            font-weight: 600;
+            color: #374151;
+            cursor: pointer;
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            margin-right: 12px;
+            border: 2px solid #667eea !important;
+            background: white !important;
+            outline: 2px solid #ff0000 !important; /* Temporary red outline for debugging */
+        }
+
+        .task-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .task-item-content {
+            flex: 1;
         }
 
         /* Tab View Styles */
@@ -330,15 +400,15 @@
             text-transform: uppercase;
         }
 
-        .status-pending { background: #fef3c7; color: #92400e; }
-        .status-running { background: #dbeafe; color: #1e40af; }
-        .status-paused { background: #fde68a; color: #78350f; }
-        .status-stopped { background: #fee2e2; color: #991b1b; }
-        .status-testing { background: #e0e7ff; color: #3730a3; }
-        .status-completed { background: #d1fae5; color: #065f46; }
-        .status-finished { background: #a7f3d0; color: #064e3b; }
-        .status-failed { background: #fee2e2; color: #991b1b; }
-        .status-exhausted { background: #fed7aa; color: #9a3412; }
+        .status-pending { background: #fbbf24; color: #92400e; }
+        .status-running { background: #3b82f6; color: #ffffff; }
+        .status-paused { background: #f59e0b; color: #78350f; }
+        .status-stopped { background: #ef4444; color: #ffffff; }
+        .status-testing { background: #8b5cf6; color: #ffffff; }
+        .status-completed { background: #10b981; color: #ffffff; }
+        .status-finished { background: #059669; color: #ffffff; }
+        .status-failed { background: #dc2626; color: #ffffff; }
+        .status-exhausted { background: #ea580c; color: #ffffff; }
 
         .task-progress {
             color: #6b7280;
@@ -1150,18 +1220,18 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div>
                     <button onclick="toggleCreateForm()" class="btn btn-sm">+ Add Task</button>
-                    <button onclick="loadTasks('running')" class="btn btn-sm">Show Running</button>
-                    <button onclick="loadTasks('pending')" class="btn btn-sm">Show Pending</button>
-                    <button onclick="loadTasks()" class="btn btn-sm">Show All</button>
+                    <button onclick="refreshTasksKeepingTab('running')" class="btn btn-sm">Show Running</button>
+                    <button onclick="refreshTasksKeepingTab('pending')" class="btn btn-sm">Show Pending</button>
+                    <button onclick="refreshTasksKeepingTab()" class="btn btn-sm">Show All</button>
                     <div style="margin-left: 15px; display: inline-block;">
                         <div style="font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 12px; margin: 0;">
                             <span>View:</span>
-                            <label class="view-mode-radio" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 12px; border-radius: 6px; transition: all 0.2s; background-color: #f9fafb; border: 1px solid #e5e7eb;">
-                                <input type="radio" name="viewMode" value="list" onchange="toggleViewMode()" style="margin: 0;">
+                            <label class="view-mode-radio" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 12px; border-radius: 6px; transition: all 0.2s; background-color: #f3f4f6; border: 1px solid #e5e7eb;">
+                                <input type="radio" name="viewMode" value="list" checked onchange="toggleViewMode()" style="margin: 0;">
                                 <span>📋 List</span>
                             </label>
-                            <label class="view-mode-radio" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 12px; border-radius: 6px; transition: all 0.2s; background-color: #f3f4f6; border: 1px solid #e5e7eb;">
-                                <input type="radio" name="viewMode" value="tabs" checked onchange="toggleViewMode()" style="margin: 0;">
+                            <label class="view-mode-radio" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 12px; border-radius: 6px; transition: all 0.2s; background-color: #f9fafb; border: 1px solid #e5e7eb;">
+                                <input type="radio" name="viewMode" value="tabs" onchange="toggleViewMode()" style="margin: 0;">
                                 <span>🗂️ Tabs</span>
                             </label>
                         </div>
@@ -1173,7 +1243,30 @@
             </div>
             <!-- Task List View (hidden by default) -->
             <div id="tasksList" class="tasks-list" style="display: none;">
-                <div class="loading">Loading tasks...</div>
+                <!-- Select All Controls -->
+                <div class="select-all-container">
+                    <input type="checkbox" id="selectAllTasks" class="task-checkbox" onchange="toggleSelectAll()">
+                    <label for="selectAllTasks">Select All Tasks</label>
+                </div>
+
+                <!-- Batch Action Toolbar -->
+                <div id="batchToolbar" class="batch-selection-toolbar">
+                    <div class="batch-selection-info">
+                        <span id="selectedCount">0</span> task(s) selected
+                    </div>
+                    <div class="batch-actions">
+                        <button onclick="batchStartTasks()" class="btn btn-success btn-sm">🚀 Start</button>
+                        <button onclick="batchDeleteTasks()" class="btn btn-danger btn-sm">🗑️ Delete Task</button>
+                        <button onclick="batchClearAndRestartTasks()" class="btn btn-warning btn-sm">🔄 Clear & Restart</button>
+                        <button onclick="batchRefreshTasks()" class="btn btn-sm">🔄 Refresh</button>
+                        <button onclick="clearSelection()" class="btn btn-sm">✖️ Clear Selection</button>
+                    </div>
+                </div>
+
+                <!-- Container for task items -->
+                <div id="tasksContainer">
+                    <div class="loading">Loading tasks...</div>
+                </div>
             </div>
 
             <!-- Task Tab View (default) -->
@@ -1197,8 +1290,8 @@
                     <!-- Fixed Input Box for Tabs View -->
                     <div class="fixed-tab-input">
                         <div style="display: flex; gap: 6px;">
-                            <input type="text" id="tabMessageInput" placeholder="Type your message here..." style="flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px;" onkeydown="if(event.key==='Enter') sendTabMessageFromInput()">
-                            <button onclick="sendTabMessageFromInput()" class="btn btn-primary" style="padding: 4px 12px;">Send</button>
+                            <input type="text" id="tabMessageInput" placeholder="Type your message here..." style="flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px;">
+                            <button class="btn btn-primary" style="padding: 4px 12px;">Send</button>
                         </div>
                     </div>
                 </div>
@@ -1241,8 +1334,17 @@
                 </div>
             </div>
             <div class="modal-body">
-                <div id="conversationContent" class="conversation">
-                    <div class="loading">Loading conversation...</div>
+                <div class="conversation-nav-container">
+                    <div class="conversation-content">
+                        <div id="conversationContent" class="conversation">
+                            <div class="loading">Loading conversation...</div>
+                        </div>
+                    </div>
+                    <div id="conversationNavSidebarModal" class="conversation-nav-sidebar">
+                        <div class="conversation-minimap" id="conversationMinimapModal">
+                            <div class="conversation-viewport-indicator" id="viewportIndicatorModal"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="message-input-box">
                     <div class="input-header">
@@ -1500,6 +1602,8 @@
             // Load project templates from localStorage
             loadProjectTemplates();
             loadIndividualProjectTemplates();
+            // Initialize view mode to ensure correct state
+            toggleViewMode();
         });
 
         // Directory browser state
@@ -2759,16 +2863,74 @@
                     toggleCreateForm();
                 }, 1500);
 
-                loadTasks();
+                refreshTasksKeepingTab();
             } catch (error) {
                 showAlert('createAlert', error.message, 'error');
             }
         });
 
+        // Global variable to track tab preservation
+        let tabToPreserve = null;
+        let tabPreservationInProgress = false;
+
+        // Smart refresh that preserves current tab state
+        async function refreshTasksKeepingTab(filter = null) {
+            console.log('🔄 refreshTasksKeepingTab: Starting tab preservation process');
+            tabPreservationInProgress = true;
+
+            // Remember current active tab in tab view
+            const currentActiveTab = document.querySelector('.task-tab.active');
+            const activeTaskName = currentActiveTab ? currentActiveTab.dataset.taskName : null;
+
+            // Get current view mode to restore after refresh
+            const viewModeElement = document.querySelector('input[name="viewMode"]:checked');
+            const currentViewMode = viewModeElement ? viewModeElement.value : 'list';
+
+            console.log('🔄 refreshTasksKeepingTab: Current state before refresh:');
+            console.log('  - Active task:', activeTaskName);
+            console.log('  - View mode:', currentViewMode);
+            console.log('  - Current active tab element:', currentActiveTab);
+            console.log('  - Filter parameter:', filter);
+
+            // DEBUGGING: Let's see ALL the current tabs
+            const allTabs = document.querySelectorAll('.task-tab');
+            console.log('🔍 ALL CURRENT TABS:');
+            allTabs.forEach((tab, index) => {
+                console.log(`  ${index + 1}. Task: ${tab.dataset.taskName}, Active: ${tab.classList.contains('active')}`);
+            });
+
+            // Set global variable for tab preservation
+            if (currentViewMode === 'tabs' && activeTaskName) {
+                tabToPreserve = activeTaskName;
+                console.log('🔄 refreshTasksKeepingTab: Set tabToPreserve to:', tabToPreserve);
+            } else {
+                tabToPreserve = null;
+                console.log('🔄 refreshTasksKeepingTab: No tab to preserve (not in tab view or no active tab)');
+                console.log('  - Reason: currentViewMode =', currentViewMode, ', activeTaskName =', activeTaskName);
+            }
+
+            // Do the full task reload
+            console.log('🔄 refreshTasksKeepingTab: Calling loadTasks() with filter:', filter);
+            await loadTasks(filter);
+            console.log('🔄 refreshTasksKeepingTab: loadTasks() completed');
+
+            // Tab preservation is now handled by the global variable and renderTabView()
+            console.log('🔄 refreshTasksKeepingTab: Tab preservation delegated to renderTabView via global variable');
+            console.log('🔄 refreshTasksKeepingTab: Current tabToPreserve value:', tabToPreserve);
+
+            // Clear the flag after a delay to allow tab preservation to complete
+            setTimeout(() => {
+                tabPreservationInProgress = false;
+                console.log('🔄 refreshTasksKeepingTab: Tab preservation completed, flag cleared');
+            }, 100);
+        }
+
         // Load tasks
         async function loadTasks(status = null) {
             const tasksList = document.getElementById('tasksList');
-            const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
+            const viewModeElement = document.querySelector('input[name="viewMode"]:checked');
+            const viewMode = viewModeElement ? viewModeElement.value : 'list';
+            console.log('loadTasks: Current view mode:', viewMode, 'Element:', viewModeElement);
 
             // Show loading message in the appropriate view
             if (viewMode === 'list') {
@@ -2817,17 +2979,63 @@
 
                 // Render based on view mode
                 if (viewMode === 'list') {
-                    tasksList.innerHTML = tasksWithStatus.map(task => renderTask(task)).join('');
+                    console.log('Rendering List view with', tasksWithStatus.length, 'tasks');
+
+                    // Generate batch controls HTML
+                    const batchControlsHTML = `
+                        <!-- Select All Controls -->
+                        <div class="select-all-container">
+                            <input type="checkbox" id="selectAllTasks" class="task-checkbox" onchange="toggleSelectAll()">
+                            <label for="selectAllTasks">Select All Tasks</label>
+                        </div>
+
+                        <!-- Batch Action Toolbar -->
+                        <div id="batchToolbar" class="batch-selection-toolbar">
+                            <div class="batch-selection-info">
+                                <span id="selectedCount">0</span> task(s) selected
+                            </div>
+                            <div class="batch-actions">
+                                <button onclick="batchStartTasks()" class="btn btn-success btn-sm">🚀 Start</button>
+                                <button onclick="batchDeleteTasks()" class="btn btn-danger btn-sm">🗑️ Delete Task</button>
+                                <button onclick="batchClearAndRestartTasks()" class="btn btn-warning btn-sm">🔄 Clear & Restart</button>
+                                <button onclick="batchRefreshTasks()" class="btn btn-sm">🔄 Refresh</button>
+                                <button onclick="clearSelection()" class="btn btn-sm">✖️ Clear Selection</button>
+                            </div>
+                        </div>
+                    `;
+
+                    // Render batch controls + tasks
+                    const tasksHTML = tasksWithStatus.map(task => renderTask(task, true)).join('');
+                    console.log('Generated batch controls HTML length:', batchControlsHTML.length);
+                    console.log('Generated tasks HTML length:', tasksHTML.length);
+
+                    tasksList.innerHTML = batchControlsHTML + tasksHTML;
+                    console.log('Set tasksList innerHTML, total length:', (batchControlsHTML + tasksHTML).length);
+
+                    // Debug: Check if checkboxes are actually in the DOM
+                    setTimeout(() => {
+                        const checkboxes = document.querySelectorAll('.task-checkbox');
+                        console.log('Found', checkboxes.length, 'checkboxes in DOM');
+                        checkboxes.forEach((cb, index) => {
+                            console.log(`Checkbox ${index}:`, cb, 'visible:', cb.offsetWidth > 0 && cb.offsetHeight > 0);
+                        });
+                    }, 100);
+
+                    // Update selection state after rendering tasks
+                    updateSelection();
                 } else {
+                    console.log('Rendering Tab view');
                     renderTabView(tasksWithStatus);
                 }
             } catch (error) {
-                tasksList.innerHTML = `<div class="error-message">Error loading tasks: ${error.message}</div>`;
+                const tasksContainer = document.getElementById('tasksContainer') || tasksList;
+                tasksContainer.innerHTML = `<div class="error-message">Error loading tasks: ${error.message}</div>`;
             }
         }
 
         // Render task
-        function renderTask(task) {
+        function renderTask(task, showCheckbox = false) {
+            console.log('renderTask called for', task.task_name, 'showCheckbox:', showCheckbox);
             const status = task.statusDetails || task;
             const statusClass = `status-${status.status.toLowerCase()}`;
 
@@ -3035,25 +3243,88 @@
                 compactMetrics += `<span class="metric">⏸️ Waiting for input</span>`;
             }
 
+            const checkboxHTML = showCheckbox ? `<input type="checkbox" class="task-checkbox task-selector" data-task-name="${task.task_name}" onchange="updateSelection()">` : '';
+            console.log('Task', task.task_name, 'checkbox HTML:', checkboxHTML);
+
             return `
-                <div class="task-item">
-                    <div class="task-header">
-                        <div class="task-name">${task.task_name}</div>
-                        <span class="task-status ${statusClass}">${status.status}</span>
+                <div class="task-item" data-task-name="${task.task_name}">
+                    ${checkboxHTML}
+                    <div class="task-item-content">
+                        <div class="task-header">
+                            <div class="task-name">${task.task_name}</div>
+                            <span class="task-status ${statusClass}">${status.status}</span>
+                        </div>
+                        <div class="task-progress">📍 ${status.progress || 'No progress info'}</div>
+                        ${compactMetrics ? `<div class="task-metrics">${compactMetrics}</div>` : ''}
+                        ${status.error_message ? `<div class="error-message">${status.error_message}</div>` : ''}
+                        <div class="task-actions">${actions}</div>
+                        ${status.status.toLowerCase() === 'running' || status.waiting_for_input ? `
+                            <div class="task-message-box" style="margin-top: 8px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <input type="text"
+                                           id="taskMessage_${task.task_name}"
+                                           placeholder="Send message to ${task.task_name}..."
+                                           style="flex: 1; padding: 4px 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px;"
+                                           onkeydown="if(event.key==='Enter') sendTaskMessage('${task.task_name}')">
+                                    <button onclick="sendTaskMessage('${task.task_name}')"
+                                            class="btn btn-primary btn-sm"
+                                            style="padding: 4px 8px; font-size: 11px;">
+                                        📤 Send
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
-                    <div class="task-progress">📍 ${status.progress || 'No progress info'}</div>
-                    ${compactMetrics ? `<div class="task-metrics">${compactMetrics}</div>` : ''}
-                    ${status.error_message ? `<div class="error-message">${status.error_message}</div>` : ''}
-                    <div class="task-actions">${actions}</div>
                 </div>
             `;
+        }
+
+        // Send message to individual task
+        async function sendTaskMessage(taskName) {
+            const inputElement = document.getElementById(`taskMessage_${taskName}`);
+            if (!inputElement) {
+                console.error('Input element not found for task:', taskName);
+                return;
+            }
+
+            const message = inputElement.value.trim();
+            if (!message) {
+                console.log('No message to send');
+                return;
+            }
+
+            try {
+                console.log('Sending message to task:', taskName, 'Message:', message);
+
+                const response = await fetch(`${API_BASE}/tasks/by-name/${taskName}/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to send message');
+                }
+
+                // Clear the input field after successful send
+                inputElement.value = '';
+                console.log('Message sent successfully');
+
+                // Optionally refresh the task to show updated status
+                setTimeout(() => refreshTasksKeepingTab(), 500);
+
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert(`Error sending message: ${error.message}`);
+            }
         }
 
         // Task actions
         async function startTask(taskName) {
             try {
                 await fetch(`${API_BASE}/tasks/by-name/${taskName}/start`, { method: 'POST' });
-                loadTasks();
+                await refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error starting task: ${error.message}`);
             }
@@ -3067,7 +3338,7 @@
 
             try {
                 await fetch(`${API_BASE}/tasks/by-name/${taskName}/stop`, { method: 'POST' });
-                loadTasks();
+                await refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error stopping task: ${error.message}`);
             }
@@ -3076,7 +3347,7 @@
         async function resumeTask(taskName) {
             try {
                 await fetch(`${API_BASE}/tasks/by-name/${taskName}/resume`, { method: 'POST' });
-                loadTasks();
+                await refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error resuming task: ${error.message}`);
             }
@@ -3096,15 +3367,18 @@
                 for (let taskItem of taskItems) {
                     const taskNameElement = taskItem.querySelector('.task-name');
                     if (taskNameElement && taskNameElement.textContent === taskName) {
+                        // Check if we're in List view to determine if checkboxes should be shown
+                        const isListView = document.getElementById('tasksList').style.display !== 'none';
+                        console.log(`Refreshing task ${taskName}, isListView: ${isListView}, showCheckbox: ${isListView}`);
                         // Replace this task element with the updated version
-                        taskItem.outerHTML = renderTask(updatedTask);
+                        taskItem.outerHTML = renderTask(updatedTask, isListView);
                         break;
                     }
                 }
             } catch (error) {
                 console.error(`Error refreshing single task ${taskName}:`, error);
                 // Fall back to full refresh if single task refresh fails
-                loadTasks();
+                refreshTasksKeepingTab();
             }
         }
 
@@ -3148,7 +3422,7 @@
                 await loadConversation(currentTaskName);
 
                 // Refresh the task list
-                loadTasks();
+                await refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error clearing and restarting task: ${error.message}`);
             }
@@ -3156,14 +3430,43 @@
 
         // Clear and restart task by name (for use in task list)
         async function clearAndRestartTaskByName(event, taskName) {
+            console.log('🔄 clearAndRestartTaskByName: Starting clear and restart for task:', taskName);
+
+            // DEBUGGING: Let's see the current state before we do anything
+            const viewModeElement = document.querySelector('input[name="viewMode"]:checked');
+            const currentViewMode = viewModeElement ? viewModeElement.value : 'unknown';
+            const currentActiveTab = document.querySelector('.task-tab.active');
+            const activeTaskName = currentActiveTab ? currentActiveTab.dataset.taskName : null;
+
+            console.log('🔍 BEFORE clearAndRestartTaskByName:');
+            console.log('  - Button clicked for task:', taskName);
+            console.log('  - Current view mode:', currentViewMode);
+            console.log('  - Current active tab element:', currentActiveTab);
+            console.log('  - Current active task name:', activeTaskName);
+            console.log('  - Are we in tabs view?', currentViewMode === 'tabs');
+            console.log('  - Is there an active tab?', !!activeTaskName);
+            console.log('  - Should preserve tab?', currentViewMode === 'tabs' && activeTaskName);
+
+            // CRITICAL: Explicitly set the tab to preserve RIGHT NOW, before any async operations
+            if (currentViewMode === 'tabs' && activeTaskName) {
+                tabToPreserve = activeTaskName;
+                console.log('🔄 clearAndRestartTaskByName: EARLY SET tabToPreserve to:', tabToPreserve);
+            } else {
+                tabToPreserve = null;
+                console.log('🔄 clearAndRestartTaskByName: EARLY SET tabToPreserve to null');
+            }
+
             const result = await showCustomConfirm(
                 `Are you sure you want to clear all conversation history and restart task "${taskName}"? This cannot be undone.`,
                 event.target
             );
             if (!result) {
+                console.log('🔄 clearAndRestartTaskByName: User cancelled operation');
                 return;
             }
+
             try {
+                console.log('🔄 clearAndRestartTaskByName: Making API call to clear and restart task');
                 const response = await fetch(`${API_BASE}/tasks/by-name/${taskName}/clear-and-restart`, { method: 'POST' });
                 if (!response.ok) {
                     const error = await response.json();
@@ -3171,16 +3474,22 @@
                 }
 
                 const result = await response.json();
+                console.log('🔄 clearAndRestartTaskByName: API call successful, showing toast');
                 showToast(result.message || 'Task conversation cleared and restarted successfully');
 
                 // Refresh the task list
-                loadTasks();
+                console.log('🔄 clearAndRestartTaskByName: Calling refreshTasksKeepingTab()');
+                await refreshTasksKeepingTab();
 
                 // If this task is currently open in the conversation modal, refresh it too
                 if (currentTaskName === taskName) {
+                    console.log('🔄 clearAndRestartTaskByName: Task is currently open in conversation, refreshing modal');
                     await loadConversation(currentTaskName);
                 }
+
+                console.log('🔄 clearAndRestartTaskByName: Clear and restart operation completed');
             } catch (error) {
+                console.log('❌ clearAndRestartTaskByName: Error occurred:', error.message);
                 alert(`Error clearing and restarting task: ${error.message}`);
             }
         }
@@ -3193,7 +3502,7 @@
 
             try {
                 await fetch(`${API_BASE}/tasks/by-name/${taskName}`, { method: 'DELETE' });
-                loadTasks();
+                refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error deleting task: ${error.message}`);
             }
@@ -3238,7 +3547,7 @@
                     ? result.message + '\n\nYou can now checkout the branches in your IDE.'
                     : result.message + '\n\nYou can now checkout the branch in your IDE.';
                 showToast(successMessage);
-                loadTasks();
+                refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error deleting worktree: ${error.message}`);
             }
@@ -3263,7 +3572,7 @@
 
                 const result = await response.json();
                 alert(`Task cloned successfully!\nNew task: ${result.new_task}`);
-                loadTasks();
+                refreshTasksKeepingTab();
             } catch (error) {
                 alert(`Error cloning task: ${error.message}`);
             }
@@ -3356,7 +3665,7 @@
                 showAlert('editAlert', 'Task updated successfully!', 'success');
                 setTimeout(() => {
                     closeEditModal();
-                    loadTasks();
+                    refreshTasksKeepingTab();
                 }, 1500);
             } catch (error) {
                 showAlert('editAlert', error.message, 'error');
@@ -3478,6 +3787,11 @@
                         messages.push(data);
                         renderMessages(content, messages);
 
+                        // Setup minimap after streaming message updates (modal view)
+                        setTimeout(() => {
+                            setupConversationMinimap(messages, 'conversationMinimapModal', 'conversationContent');
+                        }, 50);
+
                         // Auto-scroll to bottom for streaming updates
                         setTimeout(() => {
                             scrollToBottom(content, true);
@@ -3497,19 +3811,18 @@
         }
 
         function renderMessages(container, messages) {
+            console.log('🎯 RENDER MESSAGES: Called with', messages.length, 'messages, container:', container);
             // Clear container
             container.innerHTML = '';
 
             messages.forEach((msg, index) => {
                 // Skip messages with empty or whitespace-only content
                 if (!msg.content || (typeof msg.content === 'string' && msg.content.trim() === '')) {
-                    console.log('Skipping empty message:', msg);
                     return;
                 }
 
                 // Additional check for null, undefined, or non-string content that might appear empty
                 if (msg.content === null || msg.content === undefined || msg.content === 'null' || msg.content === 'undefined') {
-                    console.log('Skipping null/undefined message:', msg);
                     return;
                 }
 
@@ -3532,8 +3845,10 @@
                 // Create message div
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${messageClass}`;
+                messageDiv.id = `conversation-item-${index}`;  // Add ID for minimap navigation
                 messageDiv.setAttribute('data-msg-id', msg.id);
                 messageDiv.setAttribute('data-msg-index', index);
+
 
                 // Create header
                 const header = document.createElement('div');
@@ -3773,7 +4088,7 @@
 
                 // Reload the conversation
                 await loadConversation(currentTaskName);
-                loadTasks(); // Refresh task list
+                refreshTasksKeepingTab(); // Refresh task list
             } catch (error) {
                 alert(`Error updating message: ${error.message}`);
             }
@@ -3801,14 +4116,48 @@
                 tasksList.style.display = 'block';
                 tasksTabView.style.display = 'none';
                 document.body.classList.remove('tabs-view'); // Enable scrolling for list view
+
+                // Completely disable the tab input box and its events in List view
+                const tabInput = document.getElementById('tabMessageInput');
+                const tabInputButton = document.querySelector('.fixed-tab-input button');
+                if (tabInput) {
+                    tabInput.disabled = true;
+                    tabInput.style.display = 'none';
+                    // Remove event handlers
+                    tabInput.onkeydown = null;
+                }
+                if (tabInputButton) {
+                    tabInputButton.disabled = true;
+                    tabInputButton.style.display = 'none';
+                    // Remove event handlers
+                    tabInputButton.onclick = null;
+                }
             } else {
                 tasksList.style.display = 'none';
                 tasksTabView.style.display = 'block';
                 document.body.classList.add('tabs-view'); // Disable scrolling for tabs view
+
+                // Re-enable the tab input box in Tab view
+                const tabInput = document.getElementById('tabMessageInput');
+                const tabInputButton = document.querySelector('.fixed-tab-input button');
+                if (tabInput) {
+                    tabInput.disabled = false;
+                    tabInput.style.display = 'block';
+                    // Restore the Enter key handler that was removed
+                    tabInput.onkeydown = function(event) {
+                        if(event.key === 'Enter') sendTabMessageFromInput();
+                    };
+                }
+                if (tabInputButton) {
+                    tabInputButton.disabled = false;
+                    tabInputButton.style.display = 'block';
+                    // Restore the click handler that was removed
+                    tabInputButton.onclick = sendTabMessageFromInput;
+                }
             }
 
             // Reload tasks for the new view mode
-            loadTasks();
+            refreshTasksKeepingTab();
         }
 
         // Render tab view
@@ -3827,9 +4176,45 @@
 
             taskTabs.innerHTML = tabsHtml;
 
-            // Select first tab by default
+            // Handle tab selection based on preservation logic
             if (tasks.length > 0) {
-                selectTab(tasks[0].task_name);
+                setTimeout(() => {
+                    console.log('🔄 renderTabView: Starting tab selection logic');
+                    console.log('🔍 renderTabView: tabToPreserve =', tabToPreserve);
+                    console.log('🔍 renderTabView: typeof tabToPreserve =', typeof tabToPreserve);
+                    console.log('🔍 renderTabView: tabToPreserve is truthy?', !!tabToPreserve);
+
+                    if (tabToPreserve) {
+                        // Check if the tab to preserve exists
+                        console.log('🔍 renderTabView: Looking for tab with selector:', `.task-tab[data-task-name="${tabToPreserve}"]`);
+                        const preserveTab = document.querySelector(`.task-tab[data-task-name="${tabToPreserve}"]`);
+                        console.log('🔍 renderTabView: Found preserve tab element:', preserveTab);
+
+                        if (preserveTab) {
+                            console.log('🔄 renderTabView: Preserving tab:', tabToPreserve);
+                            selectTab(tabToPreserve);
+                            tabToPreserve = null; // Clear after use
+                            console.log('🔄 renderTabView: Cleared tabToPreserve, now =', tabToPreserve);
+                        } else {
+                            console.log('🔄 renderTabView: Tab to preserve not found, selecting first tab:', tasks[0].task_name);
+                            selectTab(tasks[0].task_name);
+                            tabToPreserve = null; // Clear after use
+                            console.log('🔄 renderTabView: Cleared tabToPreserve, now =', tabToPreserve);
+                        }
+                    } else {
+                        console.log('🔄 renderTabView: No tab to preserve (tabToPreserve is falsy)');
+                        // No tab to preserve, check if any tab is already active
+                        const currentActiveTab = document.querySelector('.task-tab.active');
+                        console.log('🔍 renderTabView: Current active tab:', currentActiveTab);
+
+                        if (!currentActiveTab) {
+                            console.log('🔄 renderTabView: No active tab found, selecting first tab:', tasks[0].task_name);
+                            selectTab(tasks[0].task_name);
+                        } else {
+                            console.log('🔄 renderTabView: Active tab already exists, keeping:', currentActiveTab.dataset.taskName);
+                        }
+                    }
+                }, 50);
             } else {
                 taskContent.innerHTML = '<div class="no-task-selected">No tasks available</div>';
             }
@@ -3837,6 +4222,8 @@
 
         // Select a tab and show its content
         async function selectTab(taskName) {
+
+            console.log('selectTab called with taskName:', taskName);
             // Close any existing tab streaming connection
             closeStreamingConnection('tab');
 
@@ -3844,9 +4231,11 @@
             const allTabs = document.querySelectorAll('.task-tab');
             allTabs.forEach(tab => tab.classList.remove('active'));
 
-            const selectedTab = document.querySelector(`[data-task-name="${taskName}"]`);
+            const selectedTab = document.querySelector(`.task-tab[data-task-name="${taskName}"]`);
+            console.log('Found selectedTab:', selectedTab?.getAttribute('data-task-name') || 'not found');
             if (selectedTab) {
                 selectedTab.classList.add('active');
+                console.log('Set tab as active:', taskName);
             }
 
             // Load task conversation
@@ -3924,7 +4313,6 @@
 
                 // Setup conversation minimap after DOM is updated
                 setTimeout(() => {
-                    console.log('Setting up conversation minimap...');
                     setupConversationMinimap(conversation);
                 }, 100);
 
@@ -3992,7 +4380,9 @@
                         </div>
                     </div>
                     <div id="conversationNavSidebar" class="conversation-nav-sidebar">
-                        <!-- Navigation indicators will be updated as conversation streams -->
+                        <div class="conversation-minimap" id="conversationMinimap">
+                            <div class="conversation-viewport-indicator" id="viewportIndicator"></div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -4003,14 +4393,49 @@
                 ${conversationContainerHtml}
             `;
 
-            // Clear navigation sidebar for streaming
-            const navSidebar = document.getElementById('conversationNavSidebar');
-            if (navSidebar) {
-                navSidebar.innerHTML = '';
-            }
+            // Navigation sidebar now contains minimap structure for streaming
 
             // Start streaming
             const conversationContainer = document.getElementById('tabConversationContainer');
+
+            // Load existing conversation first, then setup minimap correctly
+            let messages = [];
+            console.log('🔧 TAB DEBUG: Starting conversation loading for task:', taskName);
+            console.log('🔧 TAB DEBUG: Conversation container element:', conversationContainer);
+
+            try {
+                const url = `${API_BASE}/tasks/by-name/${taskName}/conversation`;
+                console.log('🔧 TAB DEBUG: Fetching conversation from:', url);
+
+                const response = await fetch(url);
+                console.log('🔧 TAB DEBUG: Fetch response status:', response.status, response.ok);
+
+                if (response.ok) {
+                    const conversationData = await response.json();
+                    console.log('🔧 TAB DEBUG: Raw conversation data:', conversationData);
+
+                    messages = conversationData.conversation || [];
+                    console.log('🔧 TAB DEBUG: Extracted messages array:', messages.length, 'messages');
+
+                    // Render existing messages first
+                    if (messages.length > 0) {
+                        console.log('🔧 TAB DEBUG: Calling renderMessages with', messages.length, 'messages');
+                        renderMessages(conversationContainer, messages);
+                        console.log('🔧 TAB DEBUG: renderMessages completed');
+                    } else {
+                        console.log('🔧 TAB DEBUG: No messages to render');
+                    }
+                } else {
+                    console.error('🔧 TAB DEBUG: Response not OK:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('🔧 TAB DEBUG: Error loading existing conversation:', error);
+            }
+
+            // Setup minimap with existing messages (or empty if none)
+            setTimeout(() => {
+                setupConversationMinimap(messages, 'conversationMinimap', 'tabConversationContainer');
+            }, 100);
 
             // Immediately scroll to bottom for streaming view
             setTimeout(() => {
@@ -4023,11 +4448,12 @@
             }, 100);
             streamingConnections.tab = new EventSource(`${API_BASE}/tasks/by-name/${encodeURIComponent(taskName)}/stream`);
 
-            const messages = [];
+            // messages array already initialized above with existing conversation
 
             streamingConnections.tab.onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);
+                    console.log('🎯 TAB STREAMING: Received message:', data);
 
                     // Handle status updates
                     if (data.type === 'status') {
@@ -4045,16 +4471,50 @@
                             }
                         }
 
-                        // If task completed, close stream and reload
+                        // If task completed, close stream and reload only if current tab
                         if (data.status === 'completed' || data.status === 'failed' || data.status === 'stopped') {
                             streamingConnections.tab.close();
                             streamingConnections.tab = null;
-                            setTimeout(() => selectTab(taskName), 500);
+                            // Only refresh if this is the currently active tab
+                            const activeTab = document.querySelector('.task-tab.active');
+                            if (activeTab && activeTab.dataset.taskName === taskName) {
+                                setTimeout(() => {
+                                    if (!tabPreservationInProgress) {
+                                        console.log('🔄 Delayed selectTab: Calling selectTab for', taskName);
+                                        selectTab(taskName);
+                                    } else {
+                                        console.log('🔄 Delayed selectTab: Skipping selectTab due to tab preservation in progress');
+                                    }
+                                }, 500);
+                            }
                         }
                     } else {
-                        // Handle new interaction message
-                        messages.push(data);
+                        // Handle individual streaming message - backend now sends complete formatted messages
+                        console.log('🎯 TAB STREAMING: Received streaming message (individual), current message count:', messages.length);
+                        console.log('🎯 TAB STREAMING: Received interaction message:', data);
+                        console.log('🎯 TAB STREAMING: Conversation container element:', conversationContainer);
+                        console.log('🎯 TAB STREAMING: Container element exists?', !!conversationContainer);
+
+                        // Check if this message already exists in our array (by ID)
+                        const existingIndex = messages.findIndex(msg => msg.id === data.id);
+                        if (existingIndex !== -1) {
+                            // Update existing message
+                            messages[existingIndex] = data;
+                            console.log('🎯 TAB STREAMING: Updated existing message at index', existingIndex);
+                        } else {
+                            // Add new message
+                            messages.push(data);
+                            console.log('🎯 TAB STREAMING: Added new message, total count:', messages.length);
+                        }
+
+                        console.log('🎯 TAB STREAMING: About to call renderMessages with container:', conversationContainer?.id);
                         renderMessages(conversationContainer, messages);
+                        console.log('🎯 TAB STREAMING: renderMessages call completed');
+
+                        // Setup minimap after streaming message updates (tab view)
+                        setTimeout(() => {
+                            setupConversationMinimap(messages, 'conversationMinimap', 'tabConversationContainer');
+                        }, 50);
 
                         // Auto-scroll to bottom for streaming updates
                         setTimeout(() => {
@@ -4071,7 +4531,18 @@
                 streamingConnections.tab.close();
                 streamingConnections.tab = null;
                 conversationContainer.innerHTML += '<div class="error-message">Stream connection lost. Reloading...</div>';
-                setTimeout(() => selectTab(taskName), 2000);
+                // Only reload if this is the currently active tab
+                const activeTab = document.querySelector('.task-tab.active');
+                if (activeTab && activeTab.dataset.taskName === taskName) {
+                    setTimeout(() => {
+                        if (!tabPreservationInProgress) {
+                            console.log('🔄 Delayed selectTab (2s): Calling selectTab for', taskName);
+                            selectTab(taskName);
+                        } else {
+                            console.log('🔄 Delayed selectTab (2s): Skipping selectTab due to tab preservation in progress');
+                        }
+                    }, 2000);
+                }
             };
         }
 
@@ -4101,8 +4572,8 @@
                 actions = `<button onclick="resumeTask('${task.task_name}')" class="btn btn-success btn-sm">Resume</button>`;
             }
             actions += `<button onclick="refreshTask('${task.task_name}')" class="btn btn-sm">🔄 Refresh</button>`;
-            actions += `<button onclick="clearAndRestartTask('${task.task_name}')" class="btn btn-secondary btn-sm">🔄 Clear & Restart</button>`;
-            actions += `<button onclick="viewTaskConversation('${task.task_name}')" class="btn btn-sm">💬 Conversation</button>`;
+            actions += `<button onclick="clearAndRestartTaskByName(event, '${task.task_name}')" class="btn btn-secondary btn-sm">🔄 Clear & Restart</button>`;
+            actions += `<button onclick="viewConversation('${task.task_name}')" class="btn btn-sm">💬 Conversation</button>`;
 
             return actions;
         }
@@ -4623,6 +5094,10 @@
         let isSubmittingMessage = false;
 
         async function sendMessage() {
+            console.log('🔍 sendMessage() called');
+            console.log('🔍 currentTaskName:', currentTaskName);
+            console.log('🔍 messageInput value:', document.getElementById('messageInput')?.value);
+
             // Prevent double submission
             if (isSubmittingMessage) {
                 console.log('Message submission already in progress, ignoring duplicate request');
@@ -4635,7 +5110,28 @@
                 return;
             }
             if (!currentTaskName) {
-                alert('No task selected');
+                console.log('❌ No current task selected in list view');
+                // Try to find the first available task and open its conversation
+                const firstTaskRow = document.querySelector('tbody tr');
+                if (firstTaskRow) {
+                    const taskNameCell = firstTaskRow.querySelector('td:first-child');
+                    if (taskNameCell) {
+                        const firstTaskName = taskNameCell.textContent.trim();
+                        console.log('🔍 Auto-opening conversation for first task:', firstTaskName);
+
+                        // Open the conversation for the first task
+                        viewConversation(firstTaskName);
+
+                        // Queue the message to be sent after conversation loads
+                        setTimeout(() => {
+                            if (document.getElementById('messageInput').value.trim()) {
+                                sendMessage();
+                            }
+                        }, 500);
+                        return;
+                    }
+                }
+                alert('No task selected. Please click "View Conversation" on a task first, or create a new task.');
                 return;
             }
 
@@ -4699,45 +5195,112 @@
         }
 
         function sendTabMessageFromInput() {
+            console.log('🔍 sendTabMessageFromInput() called');
+            const viewMode = document.querySelector('input[name="viewMode"]:checked')?.value;
+            console.log('🔍 Current view mode:', viewMode);
+
+            // Check if we're in List view - if so, do nothing silently
+            if (viewMode === 'list') {
+                console.log('🔍 In list view, silently ignoring tab message send');
+                return; // Silently ignore in List view
+            }
+
             // Get the currently active task from the tabs
-            const activeTab = document.querySelector('.task-tab.active');
+            let activeTab = document.querySelector('.task-tab.active');
+            console.log('Active tab found:', activeTab?.getAttribute('data-task-name') || 'none');
             if (!activeTab) {
-                alert('Please select a task tab first');
-                return;
+                // Fallback: try to find any tab that's currently displayed
+                const allTabs = document.querySelectorAll('.task-tab');
+                console.log('No active tab found, available tabs:', Array.from(allTabs).map(t => t.getAttribute('data-task-name')));
+
+                if (allTabs.length > 0) {
+                    // Use the first available tab and make it active
+                    activeTab = allTabs[0];
+                    const taskName = activeTab.getAttribute('data-task-name');
+                    console.log('🔍 Auto-selecting first tab:', taskName);
+
+                    // Use selectTab to properly activate the tab (this ensures proper state management)
+                    selectTab(taskName);
+
+                    // After selecting the tab, call sendTabMessage
+                    setTimeout(() => {
+                        sendTabMessage(taskName);
+                    }, 100); // Small delay to ensure tab selection completes
+                    return;
+                } else {
+                    console.log('❌ No tabs available to send message to');
+                    alert('No tasks available. Please create a task first.');
+                    return;
+                }
             }
             const taskName = activeTab.getAttribute('data-task-name');
             if (!taskName) {
-                alert('No task selected');
+                console.log('❌ Active tab found but no task name attribute');
+                alert('Error: Selected tab has no task name. Please try selecting a different tab.');
                 return;
             }
+            console.log('🔍 Sending message to active tab:', taskName);
             // Call the existing sendTabMessage function with the task name
             sendTabMessage(taskName);
         }
 
         async function sendTabMessage(taskName) {
-            const input = document.getElementById('tabMessageInput').value.trim();
+            // Prevent double submission
+            if (isSubmittingMessage) {
+                console.log('❌ SEND TAB MESSAGE: Submission already in progress, ignoring duplicate request');
+                return;
+            }
+
+            const inputElement = document.getElementById('tabMessageInput');
+            const input = inputElement ? inputElement.value.trim() : '';
+
+            console.log('=== SEND MESSAGE DEBUG ===');
+            console.log('Task name:', taskName);
+            console.log('Input element found:', !!inputElement);
+            console.log('Input element ID:', inputElement?.id);
+            console.log('Raw input value:', inputElement?.value);
+            console.log('Trimmed input value:', input);
+            console.log('Input element placeholder:', inputElement?.placeholder);
+            console.log('Current tab view mode:', document.querySelector('input[name="viewMode"]:checked')?.value);
+            console.log('Active tab:', document.querySelector('.task-tab.active')?.dataset?.taskName);
+            console.log('=== END SEND MESSAGE DEBUG ===');
+
             if (!input) {
+                console.log('❌ SEND MESSAGE: No input provided');
                 alert('Please enter a message');
                 return;
             }
 
+            isSubmittingMessage = true;
+            console.log('✅ SEND MESSAGE: Starting API calls for task:', taskName);
+
             try {
                 // Get task status
+                console.log('🔍 SEND MESSAGE: Getting task status...');
                 const statusResponse = await fetch(`${API_BASE}/tasks/by-name/${taskName}/status`);
+                console.log('📊 SEND MESSAGE: Status response status:', statusResponse.status);
                 if (!statusResponse.ok) {
+                    console.error('❌ SEND MESSAGE: Failed to get task status, response:', statusResponse);
                     throw new Error('Failed to get task status');
                 }
                 const taskStatus = await statusResponse.json();
+                console.log('📋 SEND MESSAGE: Task status:', taskStatus.status);
 
                 // Set the input message
+                console.log('📝 SEND MESSAGE: Setting input message...');
                 const setInputResponse = await fetch(`${API_BASE}/tasks/by-name/${taskName}/set-input`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ input })
                 });
+                console.log('📝 SEND MESSAGE: Set input response status:', setInputResponse.status);
                 if (!setInputResponse.ok) {
-                    throw new Error('Failed to set message');
+                    console.error('❌ SEND MESSAGE: Failed to set message, response:', setInputResponse);
+                    const errorData = await setInputResponse.json();
+                    console.error('❌ SEND MESSAGE: Error details:', errorData);
+                    throw new Error(`Failed to set message: ${errorData.detail || 'Unknown error'}`);
                 }
+                console.log('✅ SEND MESSAGE: Input message set successfully');
 
                 // Resume stopped tasks
                 if (taskStatus.status === 'STOPPED') {
@@ -4753,12 +5316,18 @@
                 // Clear input and refresh conversation
                 document.getElementById('tabMessageInput').value = '';
 
-                // Refresh the tab content to show the new message
-                setTimeout(() => {
-                    selectTab(taskName);
-                }, 1000);
+                // Refresh the tab content only if this is the currently active tab
+                const activeTab = document.querySelector('.task-tab.active');
+                if (activeTab && activeTab.dataset.taskName === taskName) {
+                    setTimeout(() => {
+                        selectTab(taskName);
+                    }, 1000);
+                }
             } catch (error) {
                 alert(`Error: ${error.message}`);
+            } finally {
+                // Always reset the flag to allow future submissions
+                isSubmittingMessage = false;
             }
         }
 
@@ -4810,7 +5379,7 @@
 
                 // Refresh the task list to show updated conversation
                 setTimeout(() => {
-                    loadTasks();
+                    refreshTasksKeepingTab();
                 }, 1000);
             } catch (error) {
                 alert(`Error: ${error.message}`);
@@ -4881,70 +5450,32 @@
             }
         });
 
-        function scrollToConversationItem(index) {
-            console.log(`=== MINIMAP CLICK DEBUG ===`);
-            console.log(`scrollToConversationItem called with index: ${index}`);
-
-            // Debug log for minimap clicks - make it very visible
-            console.log(`%c MINIMAP CLICKED! Index: ${index}`, 'background: #ff0000; color: #ffffff; font-size: 16px; padding: 5px;');
-
-            // Mini-map click confirmed - scrolling to target
-
+        function scrollToConversationItem(index, providedContainer = null) {
             // Record the time to prevent auto-scroll interference for a brief moment
             lastMiniMapClickTime = Date.now();
 
             const targetElement = document.getElementById(`conversation-item-${index}`);
-            const conversationContainer = document.getElementById('tabConversationContainer');
 
-            console.log('Looking for element:', `conversation-item-${index}`);
+            // Use provided container or find the correct conversation container
+            let conversationContainer = providedContainer;
+            if (!conversationContainer) {
+                conversationContainer = document.getElementById('tabConversationContainer');
+                if (!conversationContainer) {
+                    conversationContainer = document.getElementById('conversationContent');
+                }
+            }
+
+            console.log('=== MINIMAP CLICK DEBUG ===');
+            console.log('Clicked index:', index);
+            console.log('Target element ID:', `conversation-item-${index}`);
             console.log('Target element found:', !!targetElement);
             console.log('Container found:', !!conversationContainer);
-
-            if (targetElement) {
-                console.log('Target element details:', {
-                    id: targetElement.id,
-                    className: targetElement.className,
-                    offsetTop: targetElement.offsetTop,
-                    offsetHeight: targetElement.offsetHeight
-                });
-            } else {
-                console.log('TARGET ELEMENT NOT FOUND!');
-                // Try to find what elements actually exist
-                const allElements = document.querySelectorAll('[id*="conversation-item"]');
-                console.log('Available conversation items:', Array.from(allElements).map(el => el.id));
-            }
-
-            if (conversationContainer) {
-                console.log('Container details:', {
-                    id: conversationContainer.id,
-                    scrollTop: conversationContainer.scrollTop,
-                    scrollHeight: conversationContainer.scrollHeight,
-                    clientHeight: conversationContainer.clientHeight
-                });
-            } else {
-                console.log('CONTAINER NOT FOUND!');
-                // Try to find what containers actually exist
-                const allContainers = document.querySelectorAll('[id*="conversation"], [class*="conversation"]');
-                console.log('Available containers:', Array.from(allContainers).map(el => ({id: el.id, className: el.className})));
-            }
-
-            // Debug: try to find the actual conversation container
-            const allContainers = document.querySelectorAll('[id*="conversation"], [class*="conversation"]');
-            console.log('All conversation-related containers:', Array.from(allContainers).map(el => ({id: el.id, className: el.className})));
-
-            // Check if the container is the right one by testing scrollability
-            if (conversationContainer) {
-                console.log('Container scrollable properties:', {
-                    scrollHeight: conversationContainer.scrollHeight,
-                    clientHeight: conversationContainer.clientHeight,
-                    scrollTop: conversationContainer.scrollTop,
-                    canScroll: conversationContainer.scrollHeight > conversationContainer.clientHeight,
-                    overflowY: getComputedStyle(conversationContainer).overflowY
-                });
-            }
+            console.log('Container ID:', conversationContainer?.id);
+            console.log('Container scrollTop (before):', conversationContainer?.scrollTop);
+            console.log('Container scrollHeight:', conversationContainer?.scrollHeight);
+            console.log('Container clientHeight:', conversationContainer?.clientHeight);
 
             if (targetElement && conversationContainer) {
-                console.log('Both elements found, proceeding with scroll');
 
                 // Simple and reliable scroll calculation using offsetTop
                 const targetTop = targetElement.offsetTop;
@@ -5043,6 +5574,8 @@
                     console.log('All scrolling methods failed:', e);
                 }
 
+                console.log('Container scrollTop (after):', conversationContainer.scrollTop);
+                console.log('=== END MINIMAP CLICK DEBUG ===');
 
                 // Temporarily highlight the target element with stronger visual feedback
                 targetElement.style.transition = 'all 0.3s ease';
@@ -5075,14 +5608,57 @@
             }
         }
 
-        function setupConversationMinimap(conversation) {
-            console.log('Setting up conversation minimap with', conversation.length, 'items');
+        function setupConversationMinimap(conversation, minimapId = 'conversationMinimap', containerId = 'tabConversationContainer') {
 
-            const minimap = document.getElementById('conversationMinimap');
-            const conversationContainer = document.getElementById('tabConversationContainer');
+            let minimap = document.getElementById(minimapId);
+            let conversationContainer = document.getElementById(containerId);
 
-            if (!minimap || !conversationContainer || conversation.length === 0) {
-                console.log('Missing elements or no conversation');
+            // Smart fallback: If tab minimap doesn't exist but modal minimap does, use modal minimap
+            if (!minimap && minimapId === 'conversationMinimap') {
+                const modalMinimap = document.getElementById('conversationMinimapModal');
+                if (modalMinimap) {
+                    console.log('Tab minimap not found, falling back to modal minimap');
+                    minimap = modalMinimap;
+                    minimapId = 'conversationMinimapModal';
+                }
+            }
+
+            // Smart fallback: If tab container doesn't exist but conversationContent does, use conversationContent
+            if (!conversationContainer && containerId === 'tabConversationContainer') {
+                const contentContainer = document.getElementById('conversationContent');
+                if (contentContainer) {
+                    console.log('Tab container not found, falling back to conversationContent');
+                    conversationContainer = contentContainer;
+                    containerId = 'conversationContent';
+                }
+            }
+
+            if (!minimap || !conversationContainer) {
+                console.log('Missing elements for minimap setup (after fallback):', {
+                    minimapId,
+                    containerId,
+                    minimap: !!minimap,
+                    container: !!conversationContainer,
+                    minimapElement: minimap,
+                    containerElement: conversationContainer
+                });
+
+                // Debug: List all available elements with these IDs
+                console.log('Available elements check:');
+                console.log('- conversationMinimap:', !!document.getElementById('conversationMinimap'));
+                console.log('- conversationMinimapModal:', !!document.getElementById('conversationMinimapModal'));
+                console.log('- tabConversationContainer:', !!document.getElementById('tabConversationContainer'));
+                console.log('- conversationContent:', !!document.getElementById('conversationContent'));
+
+                return;
+            }
+
+            // Always show minimap, even if conversation is empty (especially for running tasks)
+            if (conversation.length === 0) {
+                console.log('No conversation yet, but setting up empty minimap for running task');
+                // Create minimal minimap structure with appropriate viewport indicator ID
+                const viewportIndicatorId = minimapId.includes('Modal') ? 'viewportIndicatorModal' : 'viewportIndicator';
+                minimap.innerHTML = `<div class="conversation-viewport-indicator" id="${viewportIndicatorId}"></div>`;
                 return;
             }
 
@@ -5090,10 +5666,10 @@
             const conversationItems = conversationContainer.querySelectorAll('.conversation-item');
             let totalHeight = conversationContainer.scrollHeight;
 
-            console.log('Total conversation height:', totalHeight);
 
-            // Clear minimap and add conversation items
-            minimap.innerHTML = '<div class="conversation-viewport-indicator" id="viewportIndicator"></div>';
+            // Clear minimap and add conversation items with appropriate viewport indicator ID
+            const viewportIndicatorId = minimapId.includes('Modal') ? 'viewportIndicatorModal' : 'viewportIndicator';
+            minimap.innerHTML = `<div class="conversation-viewport-indicator" id="${viewportIndicatorId}"></div>`;
 
             // Filter for only meaningful messages: human, claude non-tool, and tool results
             const meaningfulMessages = conversation.filter((interaction, index) => {
@@ -5109,7 +5685,6 @@
                 );
             });
 
-            console.log('Filtered to', meaningfulMessages.length, 'meaningful messages from', conversation.length, 'total');
 
             meaningfulMessages.forEach((interaction, filteredIndex) => {
                 // Find original index in the full conversation
@@ -5159,7 +5734,8 @@
                     console.log('Minimap item clicked:', {
                         originalIndex,
                         interactionType: interaction.type,
-                        filteredIndex
+                        filteredIndex,
+                        containerId: containerId
                     });
 
                     // Highlight the minimap item being clicked
@@ -5168,10 +5744,84 @@
                         minimapItem.style.border = '';
                     }, 1000);
 
-                    scrollToConversationItem(originalIndex);
+                    scrollToConversationItem(originalIndex, conversationContainer);
                 });
 
                 minimap.appendChild(minimapItem);
+            });
+
+            // Add click handler to minimap container for clicks on empty space
+            // This handles clicking at the bottom of the minimap to scroll to conversation bottom
+            minimap.addEventListener('click', (event) => {
+                console.log('Minimap clicked - event details:', {
+                    target: event.target,
+                    currentTarget: event.currentTarget,
+                    targetTagName: event.target.tagName,
+                    targetClassName: event.target.className,
+                    minimapElement: minimap,
+                    isMinimapTarget: event.target === minimap,
+                    hasMinimapItemClass: event.target.classList.contains('minimap-item')
+                });
+
+                // Handle clicks on minimap container OR any non-minimap-item child
+                // This ensures we catch clicks on empty space even if there are other child elements
+                const isMinimapItem = event.target.classList && event.target.classList.contains('minimap-item');
+
+                if (!isMinimapItem) {
+                    console.log('Minimap container/empty space clicked');
+
+                    const minimapRect = minimap.getBoundingClientRect();
+                    const clickY = event.clientY - minimapRect.top;
+                    const minimapHeight = minimapRect.height;
+
+                    // Calculate proportional position (0 = top, 1 = bottom)
+                    const proportionalPosition = Math.max(0, Math.min(1, clickY / minimapHeight));
+
+                    console.log('Minimap empty space click details:', {
+                        clickY,
+                        minimapHeight,
+                        proportionalPosition,
+                        containerId,
+                        clientY: event.clientY,
+                        minimapTop: minimapRect.top
+                    });
+
+                    // Map to conversation scroll position
+                    const scrollHeight = conversationContainer.scrollHeight;
+                    const containerHeight = conversationContainer.clientHeight;
+                    const maxScroll = Math.max(0, scrollHeight - containerHeight);
+
+                    // Calculate target scroll position
+                    let targetScrollTop = proportionalPosition * maxScroll;
+
+                    // Special case: if clicking very close to bottom (90%+), force scroll to absolute bottom
+                    if (proportionalPosition >= 0.9) {
+                        targetScrollTop = maxScroll;
+                        console.log('Click near bottom detected (>90%), forcing scroll to absolute bottom');
+                    }
+
+                    console.log('Proportional scroll mapping:', {
+                        scrollHeight,
+                        containerHeight,
+                        maxScroll,
+                        targetScrollTop,
+                        currentScrollTop: conversationContainer.scrollTop,
+                        willScrollToBottom: proportionalPosition >= 0.9
+                    });
+
+                    // Record click time to prevent auto-scroll interference
+                    lastMiniMapClickTime = Date.now();
+
+                    // Apply scroll
+                    conversationContainer.scrollTop = targetScrollTop;
+
+                    console.log('Applied scroll - new scrollTop:', conversationContainer.scrollTop);
+
+                    // Prevent event from bubbling to avoid interfering with other handlers
+                    event.stopPropagation();
+                } else {
+                    console.log('Minimap item clicked, letting default handler take over');
+                }
             });
 
             // Setup viewport indicator updates
@@ -5181,7 +5831,6 @@
             // Update viewport indicator on scroll
             conversationContainer.addEventListener('scroll', updateViewportIndicator);
 
-            console.log('Minimap setup complete with', meaningfulMessages.length, 'meaningful messages');
         }
 
         function showTooltip(indicator, text) {
@@ -5281,14 +5930,211 @@
             viewportIndicator.style.height = indicatorHeight + 'px';
             viewportIndicator.style.top = indicatorTop + 'px';
 
-            console.log('Viewport updated:', {
-                scrollTop,
-                scrollHeight,
-                containerHeight,
-                indicatorTop,
-                indicatorHeight
-            });
         }
+
+        // ============================================================================
+        // Batch Selection Functions
+        // ============================================================================
+
+        // Track selection state
+        let selectedTasks = new Set();
+
+        // Update selection state and UI
+        function updateSelection() {
+            const checkboxes = document.querySelectorAll('.task-selector');
+            const checkedBoxes = document.querySelectorAll('.task-selector:checked');
+
+            // Update selectedTasks set
+            selectedTasks.clear();
+            checkedBoxes.forEach(checkbox => {
+                selectedTasks.add(checkbox.dataset.taskName);
+            });
+
+            // Update UI
+            updateSelectionUI();
+        }
+
+        // Update selection UI elements
+        function updateSelectionUI() {
+            const selectedCount = selectedTasks.size;
+
+            // Get elements for List view only
+            const batchToolbar = document.getElementById('batchToolbar');
+            const selectedCountSpan = document.getElementById('selectedCount');
+            const selectAllCheckbox = document.getElementById('selectAllTasks');
+            const taskCheckboxes = document.querySelectorAll('.task-selector');
+
+            // Update List view elements (if they exist)
+            if (batchToolbar && selectedCountSpan && selectAllCheckbox) {
+                selectedCountSpan.textContent = selectedCount;
+                if (selectedCount > 0) {
+                    batchToolbar.classList.add('visible');
+                } else {
+                    batchToolbar.classList.remove('visible');
+                }
+
+                // Update select all checkbox state
+                if (selectedCount === 0) {
+                    selectAllCheckbox.indeterminate = false;
+                    selectAllCheckbox.checked = false;
+                } else if (selectedCount === taskCheckboxes.length) {
+                    selectAllCheckbox.indeterminate = false;
+                    selectAllCheckbox.checked = true;
+                } else {
+                    selectAllCheckbox.indeterminate = true;
+                    selectAllCheckbox.checked = false;
+                }
+            }
+        }
+
+        // Toggle select all
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllTasks');
+            const taskCheckboxes = document.querySelectorAll('.task-selector');
+
+            const shouldSelectAll = selectAllCheckbox.checked;
+
+            taskCheckboxes.forEach(checkbox => {
+                checkbox.checked = shouldSelectAll;
+            });
+
+            updateSelection();
+        }
+
+        // Clear selection
+        function clearSelection() {
+            document.querySelectorAll('.task-selector:checked').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateSelection();
+        }
+
+        // Get selected task names
+        function getSelectedTaskNames() {
+            return Array.from(selectedTasks);
+        }
+
+        // Batch start tasks
+        async function batchStartTasks() {
+            const taskNames = getSelectedTaskNames();
+            if (taskNames.length === 0) return;
+
+            if (!confirm(`Start ${taskNames.length} selected task(s)?`)) return;
+
+            const results = [];
+            for (const taskName of taskNames) {
+                try {
+                    await fetch(`${API_BASE}/tasks/by-name/${taskName}/start`, { method: 'POST' });
+                    results.push({ task: taskName, success: true });
+                } catch (error) {
+                    results.push({ task: taskName, success: false, error: error.message });
+                }
+            }
+
+            // Show results
+            const successful = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success).length;
+
+            let message = `Batch start completed: ${successful} successful`;
+            if (failed > 0) {
+                message += `, ${failed} failed`;
+            }
+
+            alert(message);
+            clearSelection();
+            refreshTasksKeepingTab();
+        }
+
+        // Batch clear and restart tasks
+        async function batchClearAndRestartTasks() {
+            const taskNames = getSelectedTaskNames();
+            if (taskNames.length === 0) return;
+
+            const taskList = taskNames.join('\n• ');
+            if (!confirm(`Clear & Restart ${taskNames.length} selected task(s)?\n\nThis will clear conversation history and restart:\n• ${taskList}\n\nThis action cannot be undone.`)) return;
+
+            const results = [];
+            for (const taskName of taskNames) {
+                try {
+                    await fetch(`${API_BASE}/tasks/by-name/${taskName}/clear-and-restart`, { method: 'POST' });
+                    results.push({ task: taskName, success: true });
+                } catch (error) {
+                    results.push({ task: taskName, success: false, error: error.message });
+                }
+            }
+
+            // Show results
+            const successful = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success).length;
+
+            let message = `Batch clear & restart completed: ${successful} successful`;
+            if (failed > 0) {
+                message += `, ${failed} failed`;
+            }
+
+            alert(message);
+            clearSelection();
+            refreshTasksKeepingTab();
+        }
+
+        // Batch delete tasks
+        async function batchDeleteTasks() {
+            const taskNames = getSelectedTaskNames();
+            if (taskNames.length === 0) return;
+
+            const taskList = taskNames.join('\n• ');
+            if (!confirm(`Delete ${taskNames.length} selected task(s)?\n\nThis will permanently delete:\n• ${taskList}\n\nThis action cannot be undone.`)) return;
+
+            const results = [];
+            for (const taskName of taskNames) {
+                try {
+                    await fetch(`${API_BASE}/tasks/by-name/${taskName}`, { method: 'DELETE' });
+                    results.push({ task: taskName, success: true });
+                } catch (error) {
+                    results.push({ task: taskName, success: false, error: error.message });
+                }
+            }
+
+            // Show results
+            const successful = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success).length;
+
+            let message = `Batch delete completed: ${successful} successful`;
+            if (failed > 0) {
+                message += `, ${failed} failed`;
+            }
+
+            alert(message);
+            clearSelection();
+            refreshTasksKeepingTab();
+        }
+
+        // Batch refresh tasks
+        async function batchRefreshTasks() {
+            const taskNames = getSelectedTaskNames();
+            if (taskNames.length === 0) return;
+
+            // Just refresh the task list - this will update all tasks
+            refreshTasksKeepingTab();
+            clearSelection();
+        }
+
+        // Initialize selection state when tasks are loaded
+        function initializeSelection() {
+            // Clear selection state
+            selectedTasks.clear();
+            updateSelectionUI();
+        }
+
+        // Call initialize selection after loading tasks (modify existing loadTasks)
+        const originalLoadTasks = loadTasks;
+        loadTasks = async function() {
+            await originalLoadTasks();
+            // Only initialize selection if we're in list view
+            if (document.getElementById('tasksList').style.display !== 'none') {
+                setTimeout(initializeSelection, 100); // Small delay to ensure DOM is updated
+            }
+        };
     </script>
 </body>
 </html>
