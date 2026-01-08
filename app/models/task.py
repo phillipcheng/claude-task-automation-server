@@ -26,6 +26,9 @@ class Task(Base):
     session_id = Column(String(36), ForeignKey("sessions.id"), nullable=False)
     description = Column(Text, nullable=False)
 
+    # User identification for multi-user support
+    user_id = Column(String(100), nullable=True, index=True)  # Username from frontend (e.g., userInfo.user_name)
+
     # Project context
     root_folder = Column(String(500), nullable=True)
     branch_name = Column(String(200), nullable=True)

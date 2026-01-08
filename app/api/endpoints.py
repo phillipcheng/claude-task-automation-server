@@ -307,6 +307,7 @@ async def create_task(
         task_name=task_data.task_name,
         session_id=db_session.id,
         description=task_data.description,
+        user_id=task_data.user_id,  # User identifier for multi-user support
         root_folder=root_folder,
         branch_name=branch_name,
         base_branch=base_branch,
@@ -400,6 +401,7 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
     return TaskStatusResponse(
         id=task.id,
         task_name=task.task_name,
+        user_id=task.user_id,
         root_folder=task.root_folder,
         branch_name=task.branch_name,
         base_branch=task.base_branch,
@@ -429,15 +431,17 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
 async def list_all_tasks(
     status: Optional[str] = None,
     root_folder: Optional[str] = None,
+    user_id: Optional[str] = None,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
     """
-    List all tasks, optionally filtered by status and/or root_folder.
+    List all tasks, optionally filtered by status, root_folder, and/or user_id.
 
     Args:
         status: Filter by task status (pending, running, paused, testing, completed, failed)
         root_folder: Filter by project root folder path
+        user_id: Filter by user identifier (for multi-user support)
         limit: Maximum number of tasks to return (default: 100)
     """
     query = db.query(Task)
@@ -454,6 +458,9 @@ async def list_all_tasks(
 
     if root_folder:
         query = query.filter(Task.root_folder == root_folder)
+
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
 
     tasks = query.order_by(Task.created_at.desc()).limit(limit).all()
     return tasks
@@ -1776,6 +1783,7 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
     return TaskStatusResponse(
         id=task.id,
         task_name=task.task_name,
+        user_id=task.user_id,
         root_folder=task.root_folder,
         branch_name=task.branch_name,
         base_branch=task.base_branch,
