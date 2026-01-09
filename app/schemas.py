@@ -33,6 +33,9 @@ class TaskCreate(BaseModel):
     # Project context for Claude prompts
     project_context: Optional[str] = None  # User-specified project context that will be included in Claude's prompts
 
+    # Chat mode: If True, Claude responds once and waits for user input (no auto-response)
+    chat_mode: bool = False  # Default: False (automation mode with auto-response)
+
     # End criteria configuration
     end_criteria: Optional[str] = None  # Success criteria description
     max_iterations: Optional[int] = 20  # Maximum conversation iterations
@@ -156,3 +159,56 @@ class PromptResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Project Management Schemas
+class ProjectCreate(BaseModel):
+    name: str
+    path: str
+    user_id: str
+    default_access: Optional[str] = "write"  # "read" or "write"
+    default_branch: Optional[str] = None
+    default_context: Optional[str] = None
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    path: Optional[str] = None
+    default_access: Optional[str] = None
+    default_branch: Optional[str] = None
+    default_context: Optional[str] = None
+
+
+class ProjectResponse(BaseModel):
+    id: str
+    user_id: str
+    name: str
+    path: str
+    default_access: str
+    default_branch: Optional[str]
+    default_context: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Batch Operation Schemas
+class BatchDeleteRequest(BaseModel):
+    task_names: List[str]
+    cleanup_worktree: bool = True
+
+
+class BatchDeleteResult(BaseModel):
+    task_name: str
+    success: bool
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BatchDeleteResponse(BaseModel):
+    total: int
+    successful: int
+    failed: int
+    results: List[BatchDeleteResult]

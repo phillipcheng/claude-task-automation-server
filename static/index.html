@@ -1215,6 +1215,64 @@
             </form>
         </div>
 
+        <!-- Saved Projects Panel (Initially Hidden) -->
+        <div class="card" id="projectsPanel" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">📁 Saved Projects</h2>
+                <button onclick="toggleProjectsPanel()" class="btn btn-sm">✕ Close</button>
+            </div>
+            <div id="projectsAlert"></div>
+
+            <!-- Add Project Form -->
+            <div style="background: #f9fafb; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 15px 0; font-size: 14px;">Add New Project</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="newProjectName">Project Name *</label>
+                        <input type="text" id="newProjectName" placeholder="e.g., Main Service">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="newProjectPath">Path *</label>
+                        <input type="text" id="newProjectPath" placeholder="/path/to/project">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="newProjectAccess">Default Access</label>
+                        <select id="newProjectAccess" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px;">
+                            <option value="write">Write</option>
+                            <option value="read">Read</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="newProjectBranch">Default Branch (optional)</label>
+                        <input type="text" id="newProjectBranch" placeholder="main">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="newProjectContext">Context (optional)</label>
+                    <textarea id="newProjectContext" placeholder="Description for Claude..." style="min-height: 60px;"></textarea>
+                </div>
+                <button onclick="createSavedProject()" class="btn btn-sm btn-success">+ Add Project</button>
+            </div>
+
+            <!-- Saved Projects List -->
+            <div id="savedProjectsList" style="border: 1px solid #e5e7eb; border-radius: 6px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f3f4f6;">
+                            <th style="padding: 10px; text-align: left; font-size: 13px;">Name</th>
+                            <th style="padding: 10px; text-align: left; font-size: 13px;">Path</th>
+                            <th style="padding: 10px; text-align: left; font-size: 13px;">Access</th>
+                            <th style="padding: 10px; text-align: left; font-size: 13px;">Branch</th>
+                            <th style="padding: 10px; text-align: left; font-size: 13px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="savedProjectsTableBody">
+                        <tr><td colspan="5" style="padding: 20px; text-align: center; color: #6b7280;">Loading projects...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Task List -->
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -1223,6 +1281,7 @@
                     <button onclick="refreshTasksKeepingTab('running')" class="btn btn-sm">Show Running</button>
                     <button onclick="refreshTasksKeepingTab('pending')" class="btn btn-sm">Show Pending</button>
                     <button onclick="refreshTasksKeepingTab()" class="btn btn-sm">Show All</button>
+                    <button onclick="toggleProjectsPanel()" class="btn btn-sm" style="background: #8b5cf6;">📁 Projects</button>
                     <div style="margin-left: 15px; display: inline-block;">
                         <div style="font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 12px; margin: 0;">
                             <span>View:</span>
@@ -1584,6 +1643,164 @@
             } else {
                 createCard.style.display = 'none';
             }
+        }
+
+        // ============================================
+        // Saved Projects Management (Database)
+        // ============================================
+        let savedProjects = [];
+        const DEFAULT_USER_ID = 'default_user';
+
+        function toggleProjectsPanel() {
+            const panel = document.getElementById('projectsPanel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                loadSavedProjects();
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        async function loadSavedProjects() {
+            try {
+                const response = await fetch(`${API_BASE}/projects?user_id=${DEFAULT_USER_ID}`);
+                if (response.ok) {
+                    savedProjects = await response.json();
+                    renderSavedProjectsTable();
+                }
+            } catch (error) {
+                console.error('Failed to load saved projects:', error);
+                showProjectsAlert('Failed to load projects', 'error');
+            }
+        }
+
+        function renderSavedProjectsTable() {
+            const tbody = document.getElementById('savedProjectsTableBody');
+            if (savedProjects.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #6b7280;">No saved projects. Add one above.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = savedProjects.map(project => `
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 10px; font-weight: 500;">${project.name}</td>
+                    <td style="padding: 10px; font-family: monospace; font-size: 12px;">${project.path}</td>
+                    <td style="padding: 10px;">
+                        <span style="padding: 2px 8px; border-radius: 4px; font-size: 12px; background: ${project.default_access === 'write' ? '#dbeafe' : '#dcfce7'}; color: ${project.default_access === 'write' ? '#1d4ed8' : '#166534'};">
+                            ${project.default_access}
+                        </span>
+                    </td>
+                    <td style="padding: 10px; color: #6b7280;">${project.default_branch || '-'}</td>
+                    <td style="padding: 10px;">
+                        <button onclick="addSavedProjectToTask('${project.id}')" class="btn btn-sm btn-success" style="padding: 4px 8px; font-size: 11px;" title="Add to current task">
+                            ➕ Add to Task
+                        </button>
+                        <button onclick="deleteSavedProject('${project.id}')" class="btn btn-sm btn-danger" style="padding: 4px 8px; font-size: 11px; margin-left: 4px;" title="Delete project">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function createSavedProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            const path = document.getElementById('newProjectPath').value.trim();
+            const access = document.getElementById('newProjectAccess').value;
+            const branch = document.getElementById('newProjectBranch').value.trim();
+            const context = document.getElementById('newProjectContext').value.trim();
+
+            if (!name || !path) {
+                showProjectsAlert('Name and Path are required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/projects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        path,
+                        user_id: DEFAULT_USER_ID,
+                        default_access: access,
+                        default_branch: branch || null,
+                        default_context: context || null
+                    })
+                });
+
+                if (response.ok) {
+                    // Clear form
+                    document.getElementById('newProjectName').value = '';
+                    document.getElementById('newProjectPath').value = '';
+                    document.getElementById('newProjectBranch').value = '';
+                    document.getElementById('newProjectContext').value = '';
+                    document.getElementById('newProjectAccess').value = 'write';
+
+                    showProjectsAlert('Project saved successfully!', 'success');
+                    await loadSavedProjects();
+                } else {
+                    const error = await response.json();
+                    showProjectsAlert(error.detail || 'Failed to create project', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to create project:', error);
+                showProjectsAlert('Failed to create project', 'error');
+            }
+        }
+
+        async function deleteSavedProject(projectId) {
+            if (!confirm('Delete this saved project?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showProjectsAlert('Project deleted', 'success');
+                    await loadSavedProjects();
+                } else {
+                    showProjectsAlert('Failed to delete project', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to delete project:', error);
+                showProjectsAlert('Failed to delete project', 'error');
+            }
+        }
+
+        function addSavedProjectToTask(projectId) {
+            const project = savedProjects.find(p => p.id === projectId);
+            if (!project) return;
+
+            // Add to the task creation form's project list
+            projectsData.push({
+                name: project.name,
+                path: project.path,
+                access: project.default_access,
+                context: project.default_context || '',
+                branch_name: project.default_branch || ''
+            });
+            renderProjectsList();
+
+            // Show the create form if hidden
+            const createCard = document.getElementById('createTaskCard');
+            if (createCard.style.display === 'none') {
+                createCard.style.display = 'block';
+            }
+
+            showProjectsAlert(`Added "${project.name}" to task`, 'success');
+        }
+
+        function showProjectsAlert(message, type) {
+            const alertDiv = document.getElementById('projectsAlert');
+            alertDiv.innerHTML = `
+                <div style="padding: 10px; margin-bottom: 15px; border-radius: 6px; background: ${type === 'error' ? '#fee2e2' : '#dcfce7'}; color: ${type === 'error' ? '#991b1b' : '#166534'};">
+                    ${message}
+                </div>
+            `;
+            setTimeout(() => { alertDiv.innerHTML = ''; }, 3000);
         }
 
         // Project management state
@@ -6085,26 +6302,34 @@
             const taskList = taskNames.join('\n• ');
             if (!confirm(`Delete ${taskNames.length} selected task(s)?\n\nThis will permanently delete:\n• ${taskList}\n\nThis action cannot be undone.`)) return;
 
-            const results = [];
-            for (const taskName of taskNames) {
-                try {
-                    await fetch(`${API_BASE}/tasks/by-name/${taskName}`, { method: 'DELETE' });
-                    results.push({ task: taskName, success: true });
-                } catch (error) {
-                    results.push({ task: taskName, success: false, error: error.message });
+            try {
+                const response = await fetch(`${API_BASE}/tasks/batch-delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_names: taskNames, cleanup_worktree: true })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Batch delete failed');
                 }
+
+                const result = await response.json();
+
+                let message = `Batch delete completed: ${result.successful} successful`;
+                if (result.failed > 0) {
+                    message += `, ${result.failed} failed`;
+                    const failedTasks = result.results.filter(r => !r.success);
+                    if (failedTasks.length > 0) {
+                        message += '\n\nFailed tasks:\n• ' + failedTasks.map(t => `${t.task_name}: ${t.error}`).join('\n• ');
+                    }
+                }
+
+                alert(message);
+            } catch (error) {
+                alert(`Batch delete error: ${error.message}`);
             }
 
-            // Show results
-            const successful = results.filter(r => r.success).length;
-            const failed = results.filter(r => !r.success).length;
-
-            let message = `Batch delete completed: ${successful} successful`;
-            if (failed > 0) {
-                message += `, ${failed} failed`;
-            }
-
-            alert(message);
             clearSelection();
             refreshTasksKeepingTab();
         }

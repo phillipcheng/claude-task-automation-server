@@ -21,7 +21,7 @@ class UserInputManager:
     """Manages user input queue with high priority and no race conditions."""
 
     @staticmethod
-    def add_user_input(db: Session, task_id: str, user_input: str, auto_commit: bool = True, use_separate_session: bool = False) -> bool:
+    def add_user_input(db: Session, task_id: str, user_input: str, auto_commit: bool = True, use_separate_session: bool = False, images: List[Dict[str, str]] = None) -> bool:
         """
         Add user input to the high-priority queue.
 
@@ -29,6 +29,7 @@ class UserInputManager:
             db: Database session
             task_id: ID of the task
             user_input: The user's input message
+            images: Optional list of images [{"base64": "...", "media_type": "image/png"}, ...]
 
         Returns:
             True if successfully added, False otherwise
@@ -87,6 +88,12 @@ class UserInputManager:
                 "status": "pending",  # pending -> sent -> processed
                 "processed": False  # Keep for backward compatibility
             }
+
+            # Store images if provided (format: [{"base64": "...", "media_type": "image/png"}, ...])
+            if images and len(images) > 0:
+                input_entry["images"] = images
+                print(f"🖼️ UserInputManager DEBUG: Added {len(images)} images to input entry")
+
             print(f"🔍 UserInputManager DEBUG: Created input entry: {input_entry}")
 
             # Add to queue
@@ -182,6 +189,44 @@ class UserInputManager:
         except Exception as e:
             logger.error(f"Failed to get pending user input for task {task_id}: {e}")
             return None
+
+    @staticmethod
+    def get_next_pending_user_input_with_images(db: Session, task_id: str) -> tuple[Optional[str], Optional[List[Dict[str, str]]]]:
+        """
+        Get the next PENDING user input from the queue with any attached images.
+        This prevents duplicate processing by only returning unsent messages.
+
+        Args:
+            db: Database session
+            task_id: ID of the task
+
+        Returns:
+            Tuple of (user_input_text, images_list) or (None, None) if no pending input
+        """
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task or not task.user_input_queue:
+                return None, None
+
+            # Get current queue
+            current_queue = task.user_input_queue or []
+
+            # Find first pending input (status="pending", not "sent" or "processed")
+            for entry in current_queue:
+                status = entry.get("status", "pending")  # Default to pending for backward compatibility
+                if status == "pending":
+                    user_input = entry["input"]
+                    images = entry.get("images")  # May be None or list of image dicts
+                    image_count = len(images) if images else 0
+                    print(f"📤 Found pending message with {image_count} images: {user_input[:50]}...")
+                    return user_input, images
+
+            print(f"📤 No pending messages found for task {task_id}")
+            return None, None
+
+        except Exception as e:
+            logger.error(f"Failed to get pending user input with images for task {task_id}: {e}")
+            return None, None
 
     @staticmethod
     def mark_message_as_sent(db: Session, task_id: str, user_input: str) -> bool:

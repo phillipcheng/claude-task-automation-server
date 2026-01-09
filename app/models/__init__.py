@@ -3,6 +3,7 @@ from app.models.task import Task, TaskStatus
 from app.models.test_case import TestCase, TestCaseType, TestCaseStatus
 from app.models.interaction import ClaudeInteraction, InteractionType
 from app.models.prompt import Prompt
+from app.models.project import Project, AccessType
 
 __all__ = [
     "Session",
@@ -14,4 +15,6 @@ __all__ = [
     "ClaudeInteraction",
     "InteractionType",
     "Prompt",
+    "Project",
+    "AccessType",
 ]

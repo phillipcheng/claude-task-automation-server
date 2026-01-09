@@ -15,6 +15,12 @@ from app.schemas import (
     PromptCreate,
     PromptUpdate,
     PromptResponse,
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectResponse,
+    BatchDeleteRequest,
+    BatchDeleteResult,
+    BatchDeleteResponse,
 )
 from app.models import (
     Session as DBSession,
@@ -22,6 +28,8 @@ from app.models import (
     TaskStatus,
     TestCaseStatus,
     InteractionType,
+    Project,
+    AccessType,
 )
 from app.services.task_executor import TaskExecutor
 from app.services.git_worktree import GitWorktreeManager
@@ -317,6 +325,7 @@ async def create_task(
         end_criteria_config=end_criteria_config,
         project_context=task_data.project_context,
         projects=task_data.projects,
+        chat_mode=task_data.chat_mode,  # Chat mode: respond once and wait for user input
     )
     db.add(db_task)
     db.commit()
@@ -1061,6 +1070,7 @@ async def set_custom_human_input(
     """
     Set custom human input for the next interaction.
     Uses high-priority queue system to ensure user input is never overlooked.
+    Supports optional images field for multimodal input.
     """
     from app.services.user_input_manager import UserInputManager
 
@@ -1072,6 +1082,8 @@ async def set_custom_human_input(
         raise HTTPException(status_code=400, detail="Missing 'input' field in request body")
 
     user_input = request["input"]
+    # Handle images (optional) - format: [{"base64": "...", "media_type": "image/png"}, ...]
+    images = request.get("images", [])
 
     # Check for recent duplicate messages to prevent spam/repeated submissions
     import time
@@ -1096,7 +1108,9 @@ async def set_custom_human_input(
     # Use new high-priority user input queue system
     # Use separate session to avoid transaction conflicts with endpoint session
     print(f"🔍 DEBUG: Adding user input to queue for task {task.id} ({task_name}): '{user_input[:50]}...'")
-    success = UserInputManager.add_user_input(db, task.id, user_input, auto_commit=True, use_separate_session=True)
+    if images:
+        print(f"🖼️ DEBUG: Including {len(images)} images with user input")
+    success = UserInputManager.add_user_input(db, task.id, user_input, auto_commit=True, use_separate_session=True, images=images if images else None)
     print(f"🔍 DEBUG: UserInputManager.add_user_input() returned: {success}")
 
     if not success:
@@ -1163,10 +1177,27 @@ async def set_custom_human_input(
             if processed_input:
                 print(f"✅ Marked message as processed: {processed_input[:50]}...")
 
+    elif task.status.value == "PAUSED":
+        # Task is paused (waiting for input) - auto-resume to process user input
+        print(f"🔄 Task {task_name} is PAUSED (waiting for input) - auto-resuming to process user input")
+        from app.services.task_executor import TaskExecutor
+        task.status = TaskStatus.RUNNING
+        db.commit()
+        executor = TaskExecutor()
+        background_tasks.add_task(executor.execute_task, task.id)
+        task_executor_restarted = True
+        immediate_success = False
+        print(f"✅ Task {task_name} auto-resumed with user input")
+
+        # Mark the message as processed since it's being sent to Claude
+        processed_input = UserInputManager.get_next_user_input(db, task.id)
+        if processed_input:
+            print(f"✅ Marked message as processed: {processed_input[:50]}...")
     else:
-        # Task not running - no immediate processing
+        # Task not running (STOPPED, COMPLETED, FAILED, etc.) - no immediate processing
         immediate_success = False
         task_executor_restarted = False
+        print(f"⚠️ Task {task_name} status is {task.status.value} - input queued but task not running")
 
     # CRITICAL FIX: Use fresh session to see UserInputManager's committed changes
     from app.database import SessionLocal
@@ -1304,6 +1335,69 @@ async def delete_task_by_name(task_name: str, cleanup_worktree: bool = True, db:
         response["worktree_cleanup"] = worktree_message
 
     return response
+
+
+@router.post("/tasks/batch-delete", response_model=BatchDeleteResponse)
+async def batch_delete_tasks(request: BatchDeleteRequest, db: Session = Depends(get_db)):
+    """Delete multiple tasks by name in a single request.
+
+    This is more efficient than calling the single delete endpoint multiple times.
+    Returns detailed results for each task deletion attempt.
+    """
+    results = []
+    successful = 0
+    failed = 0
+
+    for task_name in request.task_names:
+        try:
+            task = db.query(Task).filter(Task.task_name == task_name).first()
+            if not task:
+                results.append(BatchDeleteResult(
+                    task_name=task_name,
+                    success=False,
+                    error=f"Task '{task_name}' not found"
+                ))
+                failed += 1
+                continue
+
+            worktree_message = None
+
+            # Cleanup worktree if it exists
+            if request.cleanup_worktree and task.worktree_path and task.root_folder:
+                worktree_manager = GitWorktreeManager(task.root_folder)
+                success, message = worktree_manager.remove_worktree(task_name, force=True)
+                if success:
+                    worktree_message = message
+
+            db.delete(task)
+            db.commit()
+
+            message = f"Task '{task_name}' deleted successfully"
+            if worktree_message:
+                message += f" (worktree: {worktree_message})"
+
+            results.append(BatchDeleteResult(
+                task_name=task_name,
+                success=True,
+                message=message
+            ))
+            successful += 1
+
+        except Exception as e:
+            db.rollback()
+            results.append(BatchDeleteResult(
+                task_name=task_name,
+                success=False,
+                error=str(e)
+            ))
+            failed += 1
+
+    return BatchDeleteResponse(
+        total=len(request.task_names),
+        successful=successful,
+        failed=failed,
+        results=results
+    )
 
 
 def _is_task_running(task: Task, db: Session) -> bool:
@@ -1958,3 +2052,231 @@ async def use_prompt(prompt_id: str, db: Session = Depends(get_db)):
     db.refresh(prompt)
 
     return prompt
+
+
+# ============================================================================
+# Project Management Endpoints
+# ============================================================================
+
+@router.post("/projects", response_model=ProjectResponse, status_code=201)
+async def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
+    """
+    Create a new saved project configuration.
+
+    Projects are reusable configurations that can be added to tasks.
+    Each project has a name, path, default access level, branch, and context.
+    Path can be comma-separated list of folders or files. Supports ~ expansion.
+    """
+    # Parse and validate paths (comma-separated, with ~ expansion)
+    raw_paths = [p.strip() for p in project_data.path.split(',') if p.strip()]
+    if not raw_paths:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one path is required"
+        )
+
+    # Expand ~ and validate each path
+    expanded_paths = []
+    invalid_paths = []
+    for p in raw_paths:
+        expanded = os.path.expanduser(p)
+        if os.path.exists(expanded):
+            expanded_paths.append(expanded)
+        else:
+            invalid_paths.append(p)
+
+    if invalid_paths:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Path(s) do not exist: {', '.join(invalid_paths)}"
+        )
+
+    # Store the expanded, validated paths (comma-separated)
+    validated_path = ', '.join(expanded_paths)
+
+    # Check for duplicate project (same user + same name)
+    existing = db.query(Project).filter(
+        Project.user_id == project_data.user_id,
+        Project.name == project_data.name
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A project named '{project_data.name}' already exists for this user"
+        )
+
+    # Convert access string to enum
+    access_type = AccessType.WRITE
+    if project_data.default_access:
+        try:
+            access_type = AccessType(project_data.default_access.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid access type. Must be 'read' or 'write'"
+            )
+
+    project = Project(
+        user_id=project_data.user_id,
+        name=project_data.name,
+        path=validated_path,
+        default_access=access_type,
+        default_branch=project_data.default_branch,
+        default_context=project_data.default_context,
+    )
+
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    return ProjectResponse(
+        id=project.id,
+        user_id=project.user_id,
+        name=project.name,
+        path=project.path,
+        default_access=project.default_access.value,
+        default_branch=project.default_branch,
+        default_context=project.default_context,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+    )
+
+
+@router.get("/projects", response_model=List[ProjectResponse])
+async def list_projects(
+    user_id: str,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    List all saved projects for a user.
+
+    Args:
+        user_id: User identifier (required)
+        limit: Maximum number of results (default: 50)
+    """
+    projects = db.query(Project).filter(
+        Project.user_id == user_id
+    ).order_by(Project.name).limit(limit).all()
+
+    return [
+        ProjectResponse(
+            id=p.id,
+            user_id=p.user_id,
+            name=p.name,
+            path=p.path,
+            default_access=p.default_access.value,
+            default_branch=p.default_branch,
+            default_context=p.default_context,
+            created_at=p.created_at,
+            updated_at=p.updated_at,
+        )
+        for p in projects
+    ]
+
+
+@router.get("/projects/{project_id}", response_model=ProjectResponse)
+async def get_project(project_id: str, db: Session = Depends(get_db)):
+    """Get a specific saved project by ID."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return ProjectResponse(
+        id=project.id,
+        user_id=project.user_id,
+        name=project.name,
+        path=project.path,
+        default_access=project.default_access.value,
+        default_branch=project.default_branch,
+        default_context=project.default_context,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+    )
+
+
+@router.put("/projects/{project_id}", response_model=ProjectResponse)
+async def update_project(
+    project_id: str,
+    project_data: ProjectUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an existing saved project."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Update only provided fields
+    if project_data.name is not None:
+        project.name = project_data.name
+
+    if project_data.path is not None:
+        # Parse and validate paths (comma-separated, with ~ expansion)
+        raw_paths = [p.strip() for p in project_data.path.split(',') if p.strip()]
+        if not raw_paths:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one path is required"
+            )
+
+        # Expand ~ and validate each path
+        expanded_paths = []
+        invalid_paths = []
+        for p in raw_paths:
+            expanded = os.path.expanduser(p)
+            if os.path.exists(expanded):
+                expanded_paths.append(expanded)
+            else:
+                invalid_paths.append(p)
+
+        if invalid_paths:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Path(s) do not exist: {', '.join(invalid_paths)}"
+            )
+
+        project.path = ', '.join(expanded_paths)
+
+    if project_data.default_access is not None:
+        try:
+            project.default_access = AccessType(project_data.default_access.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid access type. Must be 'read' or 'write'"
+            )
+
+    if project_data.default_branch is not None:
+        project.default_branch = project_data.default_branch
+
+    if project_data.default_context is not None:
+        project.default_context = project_data.default_context
+
+    db.commit()
+    db.refresh(project)
+
+    return ProjectResponse(
+        id=project.id,
+        user_id=project.user_id,
+        name=project.name,
+        path=project.path,
+        default_access=project.default_access.value,
+        default_branch=project.default_branch,
+        default_context=project.default_context,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+    )
+
+
+@router.delete("/projects/{project_id}")
+async def delete_project(project_id: str, db: Session = Depends(get_db)):
+    """Delete a saved project."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_name = project.name
+    db.delete(project)
+    db.commit()
+
+    return {"message": f"Project '{project_name}' deleted successfully"}

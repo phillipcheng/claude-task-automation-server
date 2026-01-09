@@ -297,6 +297,12 @@ class TaskExecutor:
                             )
 
                             logger.info(f"Processing user input for task {task.id}: {human_prompt[:50]}...")
+                        elif task.chat_mode:
+                            # CHAT MODE: Wait for user input, do NOT auto-respond
+                            logger.info(f"Task {task.id}: Chat mode enabled - waiting for user input (no auto-response)")
+                            # Stay in PAUSED state and wait for next iteration to check for user input
+                            await asyncio.sleep(2)  # Wait a bit before checking again
+                            continue  # Skip to next iteration to check for user input
                         else:
                             # Only generate simulated human if NO user input is pending
                             human_prompt = self.intelligent_responder.generate_response(

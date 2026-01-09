@@ -76,6 +76,10 @@ class Task(Base):
     # Flag to prevent duplicate processing when immediate processing is active
     immediate_processing_active = Column(Boolean, default=False, nullable=False)
 
+    # Chat mode: If True, Claude responds once and waits for user input (no auto-response)
+    # If False (default), intelligent auto-responder keeps conversation going
+    chat_mode = Column(Boolean, default=False, nullable=False)
+
     # Process tracking
     process_pid = Column(Integer, nullable=True)
 
