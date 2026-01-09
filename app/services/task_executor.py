@@ -248,6 +248,14 @@ class TaskExecutor:
 
                     logger.info(f"Task {task.id} iteration {iteration}: pending_user_input={has_pending_user_input}")
 
+                    # CHAT MODE: After Claude responds, stop and wait for user input
+                    # (unless there's already pending user input to process)
+                    if task.chat_mode and not has_pending_user_input:
+                        logger.info(f"Task {task.id}: Chat mode - Claude responded, now waiting for user input")
+                        task.status = TaskStatus.PAUSED
+                        db.commit()
+                        break  # Stop here - user needs to send next message
+
                     # If no user input is pending, check if we should continue based on last response
                     if not has_pending_user_input and not self.intelligent_responder.should_continue_conversation(
                         last_response, iteration, self.max_iterations
@@ -298,11 +306,13 @@ class TaskExecutor:
 
                             logger.info(f"Processing user input for task {task.id}: {human_prompt[:50]}...")
                         elif task.chat_mode:
-                            # CHAT MODE: Wait for user input, do NOT auto-respond
-                            logger.info(f"Task {task.id}: Chat mode enabled - waiting for user input (no auto-response)")
-                            # Stay in PAUSED state and wait for next iteration to check for user input
-                            await asyncio.sleep(2)  # Wait a bit before checking again
-                            continue  # Skip to next iteration to check for user input
+                            # CHAT MODE: Stop and wait for user input, do NOT auto-respond
+                            logger.info(f"Task {task.id}: Chat mode enabled - stopping and waiting for user input (no auto-response)")
+                            # Keep status as PAUSED and break out of the loop
+                            # Task will be resumed when user sends next message
+                            task.status = TaskStatus.PAUSED
+                            db.commit()
+                            break  # Exit the execution loop - wait for user to send next message
                         else:
                             # Only generate simulated human if NO user input is pending
                             human_prompt = self.intelligent_responder.generate_response(
@@ -553,6 +563,10 @@ class TaskExecutor:
 
         # Add standard closing instructions
         message += "\n\nPlease implement this task. You have permissions for file operations and testing. When complete, provide a summary."
+
+        # Chat mode: Add instruction to not auto-commit
+        if hasattr(task, 'chat_mode') and task.chat_mode:
+            message += "\n\nIMPORTANT: This is an interactive chat session. Do NOT automatically commit changes. Make the code changes but let the user review and decide when to commit."
 
         return message
 

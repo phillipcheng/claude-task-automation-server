@@ -204,7 +204,9 @@ async def create_task(
             for project in task_data.projects:
                 project_path = project.get("path")
                 access = project.get("access", "write")
-                project_branch = project.get("branch_name") or branch_name
+                # Always use task-based branch name for worktree isolation
+                # (ignore project's configured branch_name - that's for reference only)
+                project_branch = branch_name  # branch_name is already set to task/{task_name}
 
                 if not project_path or not os.path.exists(project_path):
                     raise HTTPException(
