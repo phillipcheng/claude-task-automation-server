@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "bytedance-mcp-overpass": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--registry",
+        "https://bnpm.byted.org",
+        "-y",
+        "@byted/mcp-proxy@latest"
+      ],
+      "env": {
+        "MCP_SERVER_PSM": "bytedance.mcp.overpass",
+        "MCP_GATEWAY_REGION": "CN"
+      }
+    }
+  }
+}

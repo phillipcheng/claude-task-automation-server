@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import asyncio
 import json
 from app.database import get_db
@@ -21,6 +21,9 @@ from app.schemas import (
     BatchDeleteRequest,
     BatchDeleteResult,
     BatchDeleteResponse,
+    ProjectBatchDeleteRequest,
+    ProjectBatchDeleteResult,
+    ProjectBatchDeleteResponse,
 )
 from app.models import (
     Session as DBSession,
@@ -29,7 +32,6 @@ from app.models import (
     TestCaseStatus,
     InteractionType,
     Project,
-    AccessType,
 )
 from app.services.task_executor import TaskExecutor
 from app.services.git_worktree import GitWorktreeManager
@@ -76,7 +78,7 @@ def get_or_create_session_for_project(db: Session, project_path: str) -> DBSessi
     return db_session
 
 
-def get_git_info(root_folder: str) -> tuple[Optional[str], Optional[str]]:
+def get_git_info(root_folder: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Get git branch and repository URL from a folder.
 
@@ -125,9 +127,12 @@ async def create_task(
     - branch_name: Git branch to work on (optional, auto-detected if not provided)
     - project_path: Legacy support, use root_folder instead
     """
+    print(f"📝 Creating task: {task_data.task_name}, chat_mode={task_data.chat_mode}")
+
     # Check if task name already exists
     existing_task = db.query(Task).filter(Task.task_name == task_data.task_name).first()
     if existing_task:
+        print(f"❌ Task '{task_data.task_name}' already exists")
         raise HTTPException(
             status_code=400,
             detail=f"Task with name '{task_data.task_name}' already exists. Use a different name or query the existing task."
@@ -166,10 +171,14 @@ async def create_task(
                 Task.status.in_([TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.PAUSED])
             ).all()
 
-            # If branch_name not specified, auto-generate unique branch
+            # If branch_name not specified, auto-generate from task name
             if not branch_name:
-                # Create unique branch name for this task
-                branch_name = f"task/{task_data.task_name.replace('/', '_').replace(' ', '_')}"
+                # Sanitize task name for git branch: replace invalid chars with underscore
+                import re
+                sanitized_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', task_data.task_name)
+                # Remove consecutive underscores and trim
+                sanitized_name = re.sub(r'_+', '_', sanitized_name).strip('_')
+                branch_name = f"task/{sanitized_name}"
 
             # Validate branch uniqueness if multiple tasks on same project
             if existing_tasks:
@@ -182,98 +191,28 @@ async def create_task(
                                f"Please specify a different branch_name or wait for the other task to complete."
                     )
 
-                # Enforce worktree usage for parallel tasks
-                if not task_data.use_worktree:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Multiple tasks detected on project '{root_folder}'. "
-                               f"You must use worktrees (use_worktree=true) for parallel task execution."
-                    )
+                # Note: Worktree creation is now handled dynamically in _execute_with_claude
+                # based on planning phase results. No need to enforce here.
+                pass
 
-        # Handle multi-project setup or single project worktree
-        worktree_paths = {}  # Store worktree paths for each project
+        # Worktree creation is now handled dynamically during task execution
+        # The planning phase in _execute_with_claude determines if write access is needed
+        # and creates worktrees on-demand. This allows:
+        # 1. Read-only tasks to run without worktrees
+        # 2. Tasks that start as read-only but need write later to get worktrees dynamically
+        # 3. Multi-project tasks to only create worktrees for projects that actually need modification
 
+        # Validate project paths exist (if provided)
         if task_data.projects:
-            # Multi-project mode: create worktrees for all projects with "write" access
-            if not task_data.use_worktree:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Multi-project tasks require worktrees (use_worktree=true) for isolation."
-                )
-
             for project in task_data.projects:
                 project_path = project.get("path")
-                access = project.get("access", "write")
-                # Always use task-based branch name for worktree isolation
-                # (ignore project's configured branch_name - that's for reference only)
-                project_branch = branch_name  # branch_name is already set to task/{task_name}
-
-                if not project_path or not os.path.exists(project_path):
+                if project_path and not os.path.exists(project_path):
                     raise HTTPException(
                         status_code=400,
                         detail=f"Project path '{project_path}' does not exist."
                     )
 
-                # Only create worktrees for projects with write access
-                if access == "write":
-                    # Check if it's a git repo
-                    _, project_git_repo = get_git_info(project_path)
-                    if project_git_repo:
-                        if not GitWorktreeManager.is_worktree_supported(project_path):
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"Git worktree is not supported for project '{project_path}' (requires git 2.5+)."
-                            )
-
-                        worktree_manager = GitWorktreeManager(project_path)
-                        success, wt_path, message = worktree_manager.create_worktree(
-                            task_data.task_name,
-                            project_branch,
-                            base_branch
-                        )
-
-                        if success:
-                            worktree_paths[project_path] = wt_path
-                        else:
-                            raise HTTPException(
-                                status_code=500,
-                                detail=f"Failed to create worktree for project '{project_path}': {message}"
-                            )
-
-            # For multi-project mode, use the first write project as the main worktree
-            main_project = next((p for p in task_data.projects if p.get("access", "write") == "write"), None)
-            if main_project:
-                worktree_path = worktree_paths.get(main_project["path"])
-                actual_working_dir = worktree_path or main_project["path"]
-
-        elif task_data.use_worktree and git_repo:
-            # Single project mode: original logic
-            worktree_manager = GitWorktreeManager(root_folder)
-
-            # Check if git worktree is supported
-            if GitWorktreeManager.is_worktree_supported(root_folder):
-                success, wt_path, message = worktree_manager.create_worktree(
-                    task_data.task_name,
-                    branch_name,
-                    base_branch
-                )
-
-                if success:
-                    worktree_path = wt_path
-                    actual_working_dir = wt_path
-                else:
-                    # Worktree creation failed - this is critical for parallel tasks
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to create worktree: {message}. Cannot proceed with task creation."
-                    )
-            else:
-                # Git worktree not supported
-                raise HTTPException(
-                    status_code=400,
-                    detail="Git worktree is not supported (requires git 2.5+). Please upgrade git or disable worktree usage."
-                )
-        elif not branch_name:
+        if not branch_name:
             # Not using worktree, fall back to detected branch
             branch_name = detected_branch
 
@@ -328,6 +267,7 @@ async def create_task(
         project_context=task_data.project_context,
         projects=task_data.projects,
         chat_mode=task_data.chat_mode,  # Chat mode: respond once and wait for user input
+        mcp_servers=task_data.mcp_servers,  # Custom MCP tools
     )
     db.add(db_task)
     db.commit()
@@ -433,6 +373,7 @@ async def get_task_status_by_name(task_name: str, db: Session = Depends(get_db))
         end_criteria_config=task.end_criteria_config,
         total_tokens_used=task.total_tokens_used,
         interaction_count=interaction_count,
+        chat_mode=task.chat_mode,
         process_running=process_running,
         process_pid=task.process_pid,
     )
@@ -443,7 +384,11 @@ async def list_all_tasks(
     status: Optional[str] = None,
     root_folder: Optional[str] = None,
     user_id: Optional[str] = None,
+    name_filter: Optional[str] = None,
+    sort_by: str = "updated_at",
+    sort_order: str = "desc",
     limit: int = 100,
+    offset: int = 0,
     db: Session = Depends(get_db)
 ):
     """
@@ -453,7 +398,11 @@ async def list_all_tasks(
         status: Filter by task status (pending, running, paused, testing, completed, failed)
         root_folder: Filter by project root folder path
         user_id: Filter by user identifier (for multi-user support)
+        name_filter: Filter by task name (case-insensitive substring match)
+        sort_by: Field to sort by (created_at, updated_at, task_name). Default: updated_at
+        sort_order: Sort order (asc, desc). Default: desc
         limit: Maximum number of tasks to return (default: 100)
+        offset: Number of tasks to skip for pagination (default: 0)
     """
     query = db.query(Task)
 
@@ -473,7 +422,23 @@ async def list_all_tasks(
     if user_id:
         query = query.filter(Task.user_id == user_id)
 
-    tasks = query.order_by(Task.created_at.desc()).limit(limit).all()
+    if name_filter:
+        query = query.filter(Task.task_name.ilike(f"%{name_filter}%"))
+
+    # Determine sort field
+    sort_field = Task.updated_at
+    if sort_by == "created_at":
+        sort_field = Task.created_at
+    elif sort_by == "task_name":
+        sort_field = Task.task_name
+
+    # Apply sort order
+    if sort_order == "asc":
+        query = query.order_by(sort_field.asc())
+    else:
+        query = query.order_by(sort_field.desc())
+
+    tasks = query.offset(offset).limit(limit).all()
     return tasks
 
 
@@ -495,10 +460,81 @@ async def start_task(
         )
 
     # Start task execution in background
+    print(f"🚀 Starting task executor for task: {task.id} ({task_name})")
     executor = TaskExecutor()
     background_tasks.add_task(executor.execute_task, task.id)
 
     return {"message": f"Task '{task_name}' started", "status": "running"}
+
+
+@router.post("/tasks/by-name/{task_name}/clone")
+async def clone_task(
+    task_name: str,
+    new_name: Optional[str] = None,
+    continue_session: bool = False,
+    db: Session = Depends(get_db)
+):
+    """Clone an existing task with all its settings but without conversation history.
+
+    Args:
+        task_name: Name of the task to clone
+        new_name: Optional new name for the cloned task. Defaults to "{original_name}_copy"
+        continue_session: If True, the new task will continue Claude's conversation context
+                          from the original task (shares the same claude_session_id)
+    """
+    import uuid
+    from datetime import datetime
+
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    # Generate new name if not provided
+    if not new_name:
+        base_name = f"{task_name}_copy"
+        new_name = base_name
+        counter = 1
+        while db.query(Task).filter(Task.task_name == new_name).first():
+            new_name = f"{base_name}_{counter}"
+            counter += 1
+    else:
+        # Check if new name already exists
+        if db.query(Task).filter(Task.task_name == new_name).first():
+            raise HTTPException(status_code=400, detail=f"Task with name '{new_name}' already exists")
+
+    # Create new task with same settings
+    new_task = Task(
+        id=str(uuid.uuid4()),
+        session_id=str(uuid.uuid4()),
+        task_name=new_name,
+        description=task.description,
+        user_id=task.user_id,
+        root_folder=task.root_folder,
+        git_repo=task.git_repo,
+        base_branch=task.base_branch,
+        status=TaskStatus.PENDING,
+        chat_mode=task.chat_mode,
+        project_context=task.project_context,
+        projects=task.projects,
+        mcp_servers=task.mcp_servers,
+        end_criteria_config=task.end_criteria_config,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        # Copy Claude session ID if continue_session is True
+        claude_session_id=task.claude_session_id if continue_session else None,
+    )
+
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+
+    return {
+        "message": f"Task '{task_name}' cloned successfully",
+        "original_task": task_name,
+        "new_task": new_name,
+        "new_task_id": new_task.id,
+        "session_continued": continue_session and task.claude_session_id is not None,
+    }
 
 
 @router.post("/tasks/by-name/{task_name}/stop")
@@ -706,6 +742,243 @@ async def resume_task(
     background_tasks.add_task(executor.execute_task, task.id)
 
     return {"message": f"Task '{task_name}' resumed", "status": "running"}
+
+
+@router.post("/tasks/by-name/{task_name}/recover")
+async def recover_task(
+    task_name: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Recover a failed task by starting a fresh Claude session while preserving conversation history.
+
+    This endpoint:
+    1. Clears the invalid Claude session ID
+    2. Clears the error message
+    3. Builds a recovery context from conversation history
+    4. Restarts the task with a new Claude session
+
+    The conversation history is summarized and injected as context so Claude
+    understands what was done before the failure.
+    """
+    from app.models.interaction import ClaudeInteraction, InteractionType
+
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    if task.status not in [TaskStatus.FAILED, TaskStatus.EXHAUSTED, TaskStatus.STOPPED]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task can only be recovered from FAILED/EXHAUSTED/STOPPED status. Current status: {task.status}"
+        )
+
+    # Get conversation history for context
+    interactions = db.query(ClaudeInteraction).filter(
+        ClaudeInteraction.task_id == task.id
+    ).order_by(ClaudeInteraction.created_at).all()
+
+    # Build recovery context from conversation history
+    recovery_context_parts = []
+    for interaction in interactions[-10:]:  # Last 10 interactions for context
+        role = "User" if interaction.interaction_type == InteractionType.USER_REQUEST else \
+               "Assistant" if interaction.interaction_type == InteractionType.CLAUDE_RESPONSE else \
+               "System"
+        # Truncate long content
+        content = interaction.content[:500] + "..." if len(interaction.content) > 500 else interaction.content
+        recovery_context_parts.append(f"[{role}]: {content}")
+
+    recovery_context = "\n\n".join(recovery_context_parts) if recovery_context_parts else ""
+
+    # Store recovery context as a system message so Claude gets it
+    if recovery_context:
+        recovery_message = f"""=== RECOVERY MODE ===
+The previous session was interrupted. Here is a summary of the conversation so far:
+
+{recovery_context}
+
+=== END OF RECOVERY CONTEXT ===
+
+Please continue from where we left off. If you were in the middle of a task, please resume it."""
+
+        # Save recovery context as system message
+        from app.models.interaction import ClaudeInteraction
+        recovery_interaction = ClaudeInteraction(
+            task_id=task.id,
+            interaction_type=InteractionType.SYSTEM_MESSAGE,
+            content=recovery_message
+        )
+        db.add(recovery_interaction)
+
+    # Clear invalid session and error
+    old_session_id = task.claude_session_id
+    task.claude_session_id = None  # Force new session
+    task.error_message = None
+    task.status = TaskStatus.RUNNING
+    task.user_input_pending = False
+    db.commit()
+
+    # Start task execution in background
+    executor = TaskExecutor()
+    background_tasks.add_task(executor.execute_task, task.id)
+
+    return {
+        "message": f"Task '{task_name}' is recovering with fresh Claude session",
+        "status": "running",
+        "previous_session_cleared": old_session_id is not None,
+        "conversation_preserved": len(interactions) > 0,
+        "interactions_count": len(interactions)
+    }
+
+
+@router.post("/tasks/by-name/{task_name}/merge-to-test")
+async def merge_task_to_test(
+    task_name: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Merge the task's worktree branch to the project's default branch for integration testing.
+
+    This prepares the code for release to test environment.
+    """
+    import subprocess
+
+    task = db.query(Task).filter(Task.task_name == task_name).first()
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+    # Check task has a worktree with changes
+    if not task.worktree_path or not task.branch_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Task has no worktree branch. Nothing to merge."
+        )
+
+    if not os.path.exists(task.worktree_path):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Worktree path no longer exists: {task.worktree_path}"
+        )
+
+    # Determine the target branch (default_branch from project)
+    target_branch = None
+
+    # Try to get from task's projects config
+    if task.projects:
+        for project in task.projects:
+            if project.get('default_branch'):
+                target_branch = project.get('default_branch')
+                break
+
+    # Fallback to base_branch if set
+    if not target_branch and task.base_branch:
+        target_branch = task.base_branch
+
+    # Fallback to common defaults
+    if not target_branch:
+        target_branch = "main"  # Default fallback
+
+    # Get the main repo path (not worktree)
+    main_repo_path = task.root_folder
+    if not main_repo_path or not os.path.exists(main_repo_path):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot find main repository path"
+        )
+
+    try:
+        # Step 1: Fetch latest from remote in main repo
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=main_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        # Step 2: Checkout the target branch in main repo
+        checkout_result = subprocess.run(
+            ["git", "checkout", target_branch],
+            cwd=main_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if checkout_result.returncode != 0:
+            # Try to create from remote if doesn't exist locally
+            checkout_result = subprocess.run(
+                ["git", "checkout", "-b", target_branch, f"origin/{target_branch}"],
+                cwd=main_repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if checkout_result.returncode != 0:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to checkout target branch '{target_branch}': {checkout_result.stderr}"
+                )
+
+        # Step 3: Pull latest changes on target branch
+        pull_result = subprocess.run(
+            ["git", "pull", "origin", target_branch],
+            cwd=main_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        # Step 4: Merge the task branch into target branch
+        merge_result = subprocess.run(
+            ["git", "merge", task.branch_name, "--no-edit", "-m", f"Merge {task.branch_name} for testing (task: {task.task_name})"],
+            cwd=main_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if merge_result.returncode != 0:
+            # Check for merge conflicts
+            if "CONFLICT" in merge_result.stdout or "CONFLICT" in merge_result.stderr:
+                # Abort the merge
+                subprocess.run(["git", "merge", "--abort"], cwd=main_repo_path, capture_output=True)
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Merge conflict detected. Please resolve manually. Details: {merge_result.stderr}"
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Merge failed: {merge_result.stderr}"
+            )
+
+        # Step 5: Push to remote (optional - can be configured)
+        push_result = subprocess.run(
+            ["git", "push", "origin", target_branch],
+            cwd=main_repo_path,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        push_success = push_result.returncode == 0
+
+        return {
+            "message": f"Successfully merged '{task.branch_name}' into '{target_branch}'",
+            "source_branch": task.branch_name,
+            "target_branch": target_branch,
+            "pushed": push_success,
+            "push_message": push_result.stdout if push_success else push_result.stderr
+        }
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Git operation timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Merge operation failed: {str(e)}")
 
 
 @router.post("/tasks/by-name/{task_name}/clear-and-restart")
@@ -1611,6 +1884,9 @@ async def update_task(task_name: str, task_update: dict, db: Session = Depends(g
     if "project_context" in task_update:
         task.project_context = task_update["project_context"]
 
+    if "mcp_servers" in task_update:
+        task.mcp_servers = task_update["mcp_servers"]
+
     db.commit()
     db.refresh(task)
 
@@ -1635,7 +1911,8 @@ async def update_task(task_name: str, task_update: dict, db: Session = Depends(g
         test_cases=[],
         interactions=[],
         projects=task.projects,
-        project_context=task.project_context
+        project_context=task.project_context,
+        mcp_servers=task.mcp_servers
     )
 
 
@@ -1677,6 +1954,7 @@ async def clone_task(task_name: str, db: Session = Depends(get_db)):
         projects=original_task.projects,
         project_context=original_task.project_context,
         end_criteria_config=original_task.end_criteria_config,
+        mcp_servers=original_task.mcp_servers,  # Copy MCP tools config
     )
 
     db.add(new_task)
@@ -1900,6 +2178,7 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
         end_criteria_config=task.end_criteria_config,
         total_tokens_used=task.total_tokens_used,
         interaction_count=interaction_count,
+        chat_mode=task.chat_mode,
         process_running=process_running,
         process_pid=task.process_pid,
     )
@@ -2107,24 +2386,18 @@ async def create_project(project_data: ProjectCreate, db: Session = Depends(get_
             detail=f"A project named '{project_data.name}' already exists for this user"
         )
 
-    # Convert access string to enum
-    access_type = AccessType.WRITE
-    if project_data.default_access:
-        try:
-            access_type = AccessType(project_data.default_access.lower())
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid access type. Must be 'read' or 'write'"
-            )
+    # Build config dict from the config schema
+    config_dict = None
+    if project_data.config:
+        config_dict = project_data.config.dict(exclude_none=True)
 
     project = Project(
         user_id=project_data.user_id,
         name=project_data.name,
         path=validated_path,
-        default_access=access_type,
+        project_type=project_data.project_type or "other",
         default_branch=project_data.default_branch,
-        default_context=project_data.default_context,
+        config=config_dict,
     )
 
     db.add(project)
@@ -2136,9 +2409,9 @@ async def create_project(project_data: ProjectCreate, db: Session = Depends(get_
         user_id=project.user_id,
         name=project.name,
         path=project.path,
-        default_access=project.default_access.value,
+        project_type=project.project_type,
         default_branch=project.default_branch,
-        default_context=project.default_context,
+        config=project.config,
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
@@ -2147,7 +2420,11 @@ async def create_project(project_data: ProjectCreate, db: Session = Depends(get_
 @router.get("/projects", response_model=List[ProjectResponse])
 async def list_projects(
     user_id: str,
+    name_filter: Optional[str] = None,
+    sort_by: str = "updated_at",
+    sort_order: str = "desc",
     limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db)
 ):
     """
@@ -2155,11 +2432,51 @@ async def list_projects(
 
     Args:
         user_id: User identifier (required)
+        name_filter: Filter by project name (case-insensitive substring match)
+        sort_by: Field to sort by (name, created_at, updated_at). Default: updated_at
+        sort_order: Sort order (asc, desc). Default: desc
         limit: Maximum number of results (default: 50)
+        offset: Number of projects to skip for pagination (default: 0)
     """
-    projects = db.query(Project).filter(
-        Project.user_id == user_id
-    ).order_by(Project.name).limit(limit).all()
+    query = db.query(Project).filter(Project.user_id == user_id)
+
+    if name_filter:
+        query = query.filter(Project.name.ilike(f"%{name_filter}%"))
+
+    # Determine sort field
+    sort_field = Project.updated_at
+    if sort_by == "name":
+        sort_field = Project.name
+    elif sort_by == "created_at":
+        sort_field = Project.created_at
+
+    # Apply sort order
+    if sort_order == "asc":
+        query = query.order_by(sort_field.asc())
+    else:
+        query = query.order_by(sort_field.desc())
+
+    projects = query.offset(offset).limit(limit).all()
+
+    def build_config(p):
+        """Build config from JSON config field or legacy fields for backward compatibility."""
+        if p.config:
+            return p.config
+        # Backward compatibility: build config from legacy fields
+        config = {}
+        if p.default_context:
+            config["context"] = p.default_context
+        if p.idl_repo:
+            config["idl_repo"] = p.idl_repo
+        if p.idl_file:
+            config["idl_file"] = p.idl_file
+        if p.psm:
+            config["psm"] = p.psm
+        if p.test_dir:
+            config["test_dir"] = p.test_dir
+        if p.test_tags:
+            config["test_tags"] = p.test_tags
+        return config if config else None
 
     return [
         ProjectResponse(
@@ -2167,14 +2484,64 @@ async def list_projects(
             user_id=p.user_id,
             name=p.name,
             path=p.path,
-            default_access=p.default_access.value,
+            project_type=p.project_type,
             default_branch=p.default_branch,
-            default_context=p.default_context,
+            config=build_config(p),
             created_at=p.created_at,
             updated_at=p.updated_at,
         )
         for p in projects
     ]
+
+
+@router.post("/projects/batch-delete", response_model=ProjectBatchDeleteResponse)
+async def batch_delete_projects(request: ProjectBatchDeleteRequest, db: Session = Depends(get_db)):
+    """Delete multiple projects by ID in a single request.
+
+    Returns detailed results for each project deletion attempt.
+    """
+    results = []
+    successful = 0
+    failed = 0
+
+    for project_id in request.project_ids:
+        try:
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                results.append(ProjectBatchDeleteResult(
+                    project_id=project_id,
+                    success=False,
+                    error=f"Project with ID '{project_id}' not found"
+                ))
+                failed += 1
+                continue
+
+            project_name = project.name
+            db.delete(project)
+            db.commit()
+
+            results.append(ProjectBatchDeleteResult(
+                project_id=project_id,
+                project_name=project_name,
+                success=True,
+                message=f"Project '{project_name}' deleted successfully"
+            ))
+            successful += 1
+
+        except Exception as e:
+            results.append(ProjectBatchDeleteResult(
+                project_id=project_id,
+                success=False,
+                error=str(e)
+            ))
+            failed += 1
+
+    return ProjectBatchDeleteResponse(
+        total=len(request.project_ids),
+        successful=successful,
+        failed=failed,
+        results=results
+    )
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
@@ -2184,14 +2551,33 @@ async def get_project(project_id: str, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    # Build config for response (merge config with legacy fields)
+    def build_config(p):
+        if p.config:
+            return p.config
+        config = {}
+        if p.default_context:
+            config["context"] = p.default_context
+        if p.idl_repo:
+            config["idl_repo"] = p.idl_repo
+        if p.idl_file:
+            config["idl_file"] = p.idl_file
+        if p.psm:
+            config["psm"] = p.psm
+        if p.test_dir:
+            config["test_dir"] = p.test_dir
+        if p.test_tags:
+            config["test_tags"] = p.test_tags
+        return config if config else None
+
     return ProjectResponse(
         id=project.id,
         user_id=project.user_id,
         name=project.name,
         path=project.path,
-        default_access=project.default_access.value,
+        project_type=project.project_type,
         default_branch=project.default_branch,
-        default_context=project.default_context,
+        config=build_config(project),
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
@@ -2239,32 +2625,45 @@ async def update_project(
 
         project.path = ', '.join(expanded_paths)
 
-    if project_data.default_access is not None:
-        try:
-            project.default_access = AccessType(project_data.default_access.lower())
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid access type. Must be 'read' or 'write'"
-            )
-
     if project_data.default_branch is not None:
         project.default_branch = project_data.default_branch
 
-    if project_data.default_context is not None:
-        project.default_context = project_data.default_context
+    if project_data.project_type is not None:
+        project.project_type = project_data.project_type if project_data.project_type else "other"
+
+    if project_data.config is not None:
+        project.config = project_data.config.dict(exclude_none=True)
 
     db.commit()
     db.refresh(project)
+
+    # Build config for response (merge config with legacy fields)
+    def build_config(p):
+        if p.config:
+            return p.config
+        config = {}
+        if p.default_context:
+            config["context"] = p.default_context
+        if p.idl_repo:
+            config["idl_repo"] = p.idl_repo
+        if p.idl_file:
+            config["idl_file"] = p.idl_file
+        if p.psm:
+            config["psm"] = p.psm
+        if p.test_dir:
+            config["test_dir"] = p.test_dir
+        if p.test_tags:
+            config["test_tags"] = p.test_tags
+        return config if config else None
 
     return ProjectResponse(
         id=project.id,
         user_id=project.user_id,
         name=project.name,
         path=project.path,
-        default_access=project.default_access.value,
+        project_type=project.project_type,
         default_branch=project.default_branch,
-        default_context=project.default_context,
+        config=build_config(project),
         created_at=project.created_at,
         updated_at=project.updated_at,
     )

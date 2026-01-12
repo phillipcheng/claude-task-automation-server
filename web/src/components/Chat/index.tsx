@@ -53,7 +53,7 @@ const Chat: React.FC = () => {
       const task = await taskApi.create({
         task_name: taskName,
         description: description || taskName,
-        user_id: 'web-user',
+        user_id: 'default_user',
         auto_start: false,
         max_iterations: 50,
         chat_mode: true,
@@ -94,13 +94,16 @@ const Chat: React.FC = () => {
     }
 
     try {
-      setCurrentTask(task);
+      // Fetch fresh task data to get latest status and error_message
+      const freshTask = await taskApi.get(task.task_name);
+      setCurrentTask(freshTask);
+
       const history = await taskApi.getHistory(task.task_name);
       setMessages(history);
       history.forEach((m) => seenMessageIdsRef.current.add(m.id));
 
       // Subscribe if active
-      if (['RUNNING', 'PAUSED', 'PENDING'].includes(task.status)) {
+      if (['RUNNING', 'PAUSED', 'PENDING'].includes(freshTask.status)) {
         subscribeToTask(task.task_name);
       }
 
@@ -134,18 +137,26 @@ const Chat: React.FC = () => {
     );
   }, []);
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, images?: { base64: string; media_type: string }[]) => {
     if (!currentTask) return;
 
     setIsSending(true);
     try {
       if (currentTask.status === 'PENDING') {
-        await taskApi.sendMessage({ task_name: currentTask.task_name, input: text });
+        // For PENDING tasks: send message, then start
+        await taskApi.sendMessage({ task_name: currentTask.task_name, input: text, images });
         await taskApi.start(currentTask.task_name);
         setCurrentTask({ ...currentTask, status: 'RUNNING' });
         subscribeToTask(currentTask.task_name);
+      } else if (currentTask.status === 'STOPPED' || currentTask.status === 'PAUSED') {
+        // For STOPPED/PAUSED tasks: send message, then resume
+        await taskApi.sendMessage({ task_name: currentTask.task_name, input: text, images });
+        await taskApi.resume(currentTask.task_name);
+        setCurrentTask({ ...currentTask, status: 'RUNNING' });
+        subscribeToTask(currentTask.task_name);
       } else {
-        await taskApi.sendMessage({ task_name: currentTask.task_name, input: text });
+        // For RUNNING tasks: just send message (backend handles interruption)
+        await taskApi.sendMessage({ task_name: currentTask.task_name, input: text, images });
       }
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -172,6 +183,17 @@ const Chat: React.FC = () => {
       subscribeToTask(currentTask.task_name);
     } catch (error) {
       console.error('Failed to resume task:', error);
+    }
+  };
+
+  const handleRecover = async () => {
+    if (!currentTask) return;
+    try {
+      await taskApi.recover(currentTask.task_name);
+      setCurrentTask({ ...currentTask, status: 'RUNNING', error_message: undefined });
+      subscribeToTask(currentTask.task_name);
+    } catch (error) {
+      console.error('Failed to recover task:', error);
     }
   };
 
@@ -250,8 +272,10 @@ const Chat: React.FC = () => {
               onSend={handleSendMessage}
               onStop={handleStop}
               onResume={handleResume}
+              onRecover={handleRecover}
               isSending={isSending}
               status={currentTask.status}
+              errorMessage={currentTask.error_message}
             />
           </>
         )}

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Enum, Integer, Float
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Enum, Integer, Float, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -11,6 +11,7 @@ class InteractionType(str, enum.Enum):
     CLAUDE_RESPONSE = "claude_response"
     SIMULATED_HUMAN = "simulated_human"
     TOOL_RESULT = "tool_result"
+    SYSTEM_MESSAGE = "system_message"  # For planning phase and other system-generated messages
 
 
 class ClaudeInteraction(Base):
@@ -21,6 +22,9 @@ class ClaudeInteraction(Base):
     interaction_type = Column(Enum(InteractionType, native_enum=False, length=20), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Images attached to user messages (JSON array of {"base64": "...", "media_type": "image/png"})
+    images = Column(JSON, nullable=True)
 
     # Token usage tracking (from Claude CLI result event)
     input_tokens = Column(Integer, nullable=True)

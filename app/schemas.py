@@ -16,7 +16,7 @@ class SessionResponse(BaseModel):
     updated_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class TaskCreate(BaseModel):
@@ -49,6 +49,11 @@ class TaskCreate(BaseModel):
     # ]
     projects: Optional[List[Dict[str, Any]]] = None  # Multi-project configuration with read/write access
 
+    # MCP servers for custom tools (added on top of default tools)
+    # Format: {"serverName": {"command": "npx", "args": ["..."], "env": {"KEY": "value"}}, ...}
+    # Example: {"overpass": {"command": "npx", "args": ["@byted/mcp-proxy"], "env": {"MCP_SERVER_PSM": "bytedance.mcp.overpass"}}}
+    mcp_servers: Optional[Dict[str, Any]] = None
+
 
 class TestCaseResponse(BaseModel):
     id: str
@@ -60,7 +65,7 @@ class TestCaseResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class InteractionResponse(BaseModel):
@@ -70,7 +75,7 @@ class InteractionResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class TaskResponse(BaseModel):
@@ -90,6 +95,7 @@ class TaskResponse(BaseModel):
     end_criteria_config: Optional[dict] = None
     total_tokens_used: Optional[int] = 0
     interaction_count: Optional[int] = 0
+    chat_mode: Optional[bool] = False  # Chat mode flag
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime]
@@ -97,9 +103,10 @@ class TaskResponse(BaseModel):
     interactions: List[InteractionResponse] = []
     projects: Optional[List[Dict[str, Any]]] = None
     project_context: Optional[str] = None
+    mcp_servers: Optional[Dict[str, Any]] = None  # MCP servers for custom tools
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class TaskStatusResponse(BaseModel):
@@ -115,6 +122,7 @@ class TaskStatusResponse(BaseModel):
     end_criteria_config: Optional[dict] = None
     total_tokens_used: Optional[int] = 0
     interaction_count: Optional[int] = 0
+    chat_mode: Optional[bool] = False  # Chat mode flag
     progress: str
     test_summary: dict
     latest_claude_response: Optional[str] = None  # Latest response from Claude
@@ -125,7 +133,7 @@ class TaskStatusResponse(BaseModel):
     process_pid: Optional[int] = None  # The PID of the running process (if any)
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 # Prompt Management Schemas
@@ -158,25 +166,49 @@ class PromptResponse(BaseModel):
     last_used_at: Optional[datetime]
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 # Project Management Schemas
+class ProjectConfigSchema(BaseModel):
+    """
+    Non-searchable project configuration stored as JSON.
+
+    Structure:
+    {
+        "context": "Description for Claude",
+        "idl_repo": "/path/to/idl",
+        "idl_file": "api/service.thrift",
+        "psm": "oec.reverse.strategy",
+        "test_dir": "./...",
+        "test_tags": "-tags local",
+        "overpass_module": "code.byted.org/oec/rpcv2_xxx"  # For RPC/Web/SDK after IDL change
+    }
+    """
+    context: Optional[str] = None  # Description/context for Claude
+    idl_repo: Optional[str] = None  # Path to IDL repository
+    idl_file: Optional[str] = None  # IDL file path relative to repo root
+    psm: Optional[str] = None  # Platform Service Manager identifier
+    test_dir: Optional[str] = None  # Directory containing tests
+    test_tags: Optional[str] = None  # Test tags/flags
+    overpass_module: Optional[str] = None  # Overpass module dependency after IDL change
+
+
 class ProjectCreate(BaseModel):
     name: str
     path: str
     user_id: str
-    default_access: Optional[str] = "write"  # "read" or "write"
-    default_branch: Optional[str] = None
-    default_context: Optional[str] = None
+    project_type: Optional[str] = "other"  # Project type: rpc, web, idl, sdk, other
+    default_branch: str  # Required - branch for release/integration testing
+    config: Optional[ProjectConfigSchema] = None  # All non-searchable config
 
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     path: Optional[str] = None
-    default_access: Optional[str] = None
+    project_type: Optional[str] = None
     default_branch: Optional[str] = None
-    default_context: Optional[str] = None
+    config: Optional[ProjectConfigSchema] = None
 
 
 class ProjectResponse(BaseModel):
@@ -184,14 +216,14 @@ class ProjectResponse(BaseModel):
     user_id: str
     name: str
     path: str
-    default_access: str
+    project_type: Optional[str] = "other"
     default_branch: Optional[str]
-    default_context: Optional[str]
+    config: Optional[dict] = None  # JSON config
     created_at: datetime
     updated_at: datetime
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 # Batch Operation Schemas
@@ -212,3 +244,23 @@ class BatchDeleteResponse(BaseModel):
     successful: int
     failed: int
     results: List[BatchDeleteResult]
+
+
+# Project batch delete schemas
+class ProjectBatchDeleteRequest(BaseModel):
+    project_ids: List[str]
+
+
+class ProjectBatchDeleteResult(BaseModel):
+    project_id: str
+    project_name: Optional[str] = None
+    success: bool
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+
+class ProjectBatchDeleteResponse(BaseModel):
+    total: int
+    successful: int
+    failed: int
+    results: List[ProjectBatchDeleteResult]

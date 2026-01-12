@@ -156,9 +156,16 @@ class GitWorktreeManager:
         for project in write_projects:
             project_path = project.get("path")
             project_branch = project.get("branch_name")
+            project_type = project.get("project_type", "other")
 
             if not project_path:
                 messages.append(f"Skipping project with missing path")
+                continue
+
+            # Skip worktree creation for IDL projects - use default branch directly
+            if project_type == "idl":
+                messages.append(f"Skipping worktree for IDL project: {project_path} (using default branch)")
+                project_worktree_paths[project_path] = project_path
                 continue
 
             if not self._is_git_repo(project_path):
@@ -451,8 +458,14 @@ class GitWorktreeManager:
 
         for project in write_projects:
             project_path = project.get("path")
+            project_type = project.get("project_type", "other")
 
             if not project_path or not self._is_git_repo(project_path):
+                continue
+
+            # Skip cleanup for IDL projects - they don't have worktrees
+            if project_type == "idl":
+                messages.append(f"Skipping cleanup for IDL project: {project_path} (no worktree)")
                 continue
 
             # Create a GitWorktreeManager for this project
@@ -470,7 +483,7 @@ class GitWorktreeManager:
         combined_message = "; ".join(messages) if messages else "No worktrees to clean up"
         return overall_success, combined_message
 
-    def list_worktrees(self) -> list[dict]:
+    def list_worktrees(self) -> List[Dict]:
         """
         List all git worktrees.
 

@@ -1,58 +1,55 @@
 .app {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.app-header {
-  background: white;
-  border-bottom: 1px solid var(--gray-200);
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  box-shadow: var(--shadow-sm);
-}
-
-.app-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--gray-800);
-}
-
-.app-nav {
-  display: flex;
-  gap: 4px;
-}
-
-.nav-tab {
-  padding: 8px 20px;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--gray-600);
-  border-radius: var(--border-radius);
-  transition: all 0.2s;
-}
-
-.nav-tab:hover {
-  background: var(--gray-100);
-  color: var(--gray-900);
-}
-
-.nav-tab.active {
-  background: var(--primary-color);
-  color: white;
-}
-
-.nav-tab.active:hover {
-  background: var(--primary-hover);
+  overflow: hidden;
 }
 
 .app-content {
   flex: 1;
-  padding: 24px;
-  overflow: auto;
+  overflow: hidden;
+}
+
+/* Floating Navigation */
+.floating-nav {
+  position: fixed;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  background: white;
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.floating-nav-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-500);
+  transition: all 0.2s;
+}
+
+.floating-nav-btn:hover {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.floating-nav-btn.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.floating-nav-btn.active:hover {
+  background: var(--primary-hover);
 }

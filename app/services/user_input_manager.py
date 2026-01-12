@@ -8,7 +8,7 @@ queue-based approach that ensures user input is never overlooked.
 import json
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from app.models import Task, InteractionType
 from app.models.interaction import ClaudeInteraction
@@ -191,7 +191,7 @@ class UserInputManager:
             return None
 
     @staticmethod
-    def get_next_pending_user_input_with_images(db: Session, task_id: str) -> tuple[Optional[str], Optional[List[Dict[str, str]]]]:
+    def get_next_pending_user_input_with_images(db: Session, task_id: str) -> Tuple[Optional[str], Optional[List[Dict[str, str]]]]:
         """
         Get the next PENDING user input from the queue with any attached images.
         This prevents duplicate processing by only returning unsent messages.

@@ -10,12 +10,40 @@ const api = axios.create({
   },
 });
 
+// Task list query parameters
+export interface TaskListParams {
+  userId?: string;
+  status?: string;
+  nameFilter?: string;
+  sortBy?: 'created_at' | 'updated_at' | 'task_name';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+// Project list query parameters
+export interface ProjectListParams {
+  userId: string;
+  nameFilter?: string;
+  sortBy?: 'name' | 'created_at' | 'updated_at';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
 // Task API
 export const taskApi = {
-  list: async (userId?: string, limit = 50): Promise<Task[]> => {
-    const params: Record<string, string | number> = { limit };
-    if (userId) params.user_id = userId;
-    const response = await api.get('/tasks', { params });
+  list: async (params: TaskListParams = {}): Promise<Task[]> => {
+    const queryParams: Record<string, string | number> = {
+      limit: params.limit ?? 50,
+      offset: params.offset ?? 0,
+      sort_by: params.sortBy ?? 'updated_at',
+      sort_order: params.sortOrder ?? 'desc',
+    };
+    if (params.userId) queryParams.user_id = params.userId;
+    if (params.status) queryParams.status = params.status;
+    if (params.nameFilter) queryParams.name_filter = params.nameFilter;
+    const response = await api.get('/tasks', { params: queryParams });
     return response.data;
   },
 
@@ -41,8 +69,45 @@ export const taskApi = {
     await api.post(`/tasks/by-name/${encodeURIComponent(taskName)}/resume`);
   },
 
+  recover: async (taskName: string): Promise<{
+    message: string;
+    status: string;
+    previous_session_cleared: boolean;
+    conversation_preserved: boolean;
+    interactions_count: number;
+  }> => {
+    const response = await api.post(`/tasks/by-name/${encodeURIComponent(taskName)}/recover`);
+    return response.data;
+  },
+
+  mergeToTest: async (taskName: string): Promise<{ message: string; source_branch: string; target_branch: string; pushed: boolean }> => {
+    const response = await api.post(`/tasks/by-name/${encodeURIComponent(taskName)}/merge-to-test`);
+    return response.data;
+  },
+
   delete: async (taskName: string): Promise<void> => {
     await api.delete(`/tasks/by-name/${encodeURIComponent(taskName)}`);
+  },
+
+  batchDelete: async (taskNames: string[], cleanupWorktree: boolean = true): Promise<{
+    total: number;
+    successful: number;
+    failed: number;
+    results: Array<{ task_name: string; success: boolean; message?: string; error?: string }>;
+  }> => {
+    const response = await api.post('/tasks/batch-delete', {
+      task_names: taskNames,
+      cleanup_worktree: cleanupWorktree,
+    });
+    return response.data;
+  },
+
+  clone: async (taskName: string, newName?: string, continueSession: boolean = false): Promise<Task> => {
+    const params: Record<string, string | boolean> = {};
+    if (newName) params.new_name = newName;
+    if (continueSession) params.continue_session = true;
+    const response = await api.post(`/tasks/by-name/${encodeURIComponent(taskName)}/clone`, null, { params });
+    return response.data;
   },
 
   getHistory: async (taskName: string): Promise<ChatMessage[]> => {
@@ -92,8 +157,16 @@ export const taskApi = {
 
 // Project API
 export const projectApi = {
-  list: async (userId: string): Promise<Project[]> => {
-    const response = await api.get('/projects', { params: { user_id: userId } });
+  list: async (params: ProjectListParams): Promise<Project[]> => {
+    const queryParams: Record<string, string | number> = {
+      user_id: params.userId,
+      limit: params.limit ?? 50,
+      offset: params.offset ?? 0,
+      sort_by: params.sortBy ?? 'updated_at',
+      sort_order: params.sortOrder ?? 'desc',
+    };
+    if (params.nameFilter) queryParams.name_filter = params.nameFilter;
+    const response = await api.get('/projects', { params: queryParams });
     return response.data;
   },
 
@@ -114,6 +187,18 @@ export const projectApi = {
 
   delete: async (projectId: string): Promise<void> => {
     await api.delete(`/projects/${projectId}`);
+  },
+
+  batchDelete: async (projectIds: string[]): Promise<{
+    total: number;
+    successful: number;
+    failed: number;
+    results: Array<{ project_id: string; project_name?: string; success: boolean; message?: string; error?: string }>;
+  }> => {
+    const response = await api.post('/projects/batch-delete', {
+      project_ids: projectIds,
+    });
+    return response.data;
   },
 };
 

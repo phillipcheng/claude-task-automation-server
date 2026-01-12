@@ -6,7 +6,10 @@ import asyncio
 import json
 import logging
 import shlex
-from typing import Optional, Callable
+import tempfile
+import base64
+import os
+from typing import Optional, Callable, List, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,9 @@ class StreamingCLIClient:
         output_callback: Optional[Callable[[str], None]] = None,
         session_id: Optional[str] = None,
         event_callback: Optional[Callable[[dict], None]] = None,
-    ) -> tuple[str, Optional[int], Optional[str], Optional[dict]]:
+        images: Optional[List[Dict[str, str]]] = None,
+        mcp_servers: Optional[Dict[str, dict]] = None,
+    ) -> Tuple[str, Optional[int], Optional[str], Optional[dict]]:
         """
         Send message to Claude CLI and capture streaming output in real-time.
 
@@ -34,6 +39,8 @@ class StreamingCLIClient:
             output_callback: Callback for each content chunk (sync function)
             session_id: Optional session ID to continue conversation (use -r flag)
             event_callback: Callback for each NDJSON event (for saving interactions in real-time)
+            images: Optional list of images [{"base64": "...", "media_type": "image/png"}, ...]
+            mcp_servers: Optional MCP server config {"name": {"command": "...", "args": [...], "env": {...}}}
 
         Returns:
             Tuple of (full_output, process_pid, session_id, usage_data)
@@ -43,6 +50,42 @@ class StreamingCLIClient:
         # Requires --verbose flag for stream-json to work
         # Use --permission-mode bypassPermissions to auto-approve all actions (non-interactive mode)
 
+        # Save images to temporary files if provided
+        temp_image_files = []
+        image_flags = ""
+        if images:
+            for i, img in enumerate(images):
+                try:
+                    # Determine file extension from media type
+                    media_type = img.get('media_type', 'image/png')
+                    ext = media_type.split('/')[-1]
+                    if ext == 'jpeg':
+                        ext = 'jpg'
+
+                    # Create temp file
+                    fd, temp_path = tempfile.mkstemp(suffix=f'.{ext}')
+                    temp_image_files.append(temp_path)
+
+                    # Write base64 decoded image data
+                    with os.fdopen(fd, 'wb') as f:
+                        f.write(base64.b64decode(img['base64']))
+
+                    # Add --image flag for this image
+                    image_flags += f' --image {shlex.quote(temp_path)}'
+                    logger.info(f"Saved temp image {i+1} to {temp_path}")
+                except Exception as e:
+                    logger.error(f"Failed to save temp image {i+1}: {e}")
+
+        # Build MCP config flag if custom MCP servers are provided
+        mcp_flags = ""
+        if mcp_servers:
+            # Convert MCP servers dict to the format expected by Claude CLI
+            # Format: {"mcpServers": {"name": {"command": "...", "args": [...], "env": {...}}}}
+            mcp_config = {"mcpServers": mcp_servers}
+            mcp_json = json.dumps(mcp_config)
+            mcp_flags = f' --mcp-config {shlex.quote(mcp_json)}'
+            logger.info(f"Adding MCP servers: {list(mcp_servers.keys())}")
+
         # Build command string for shell execution
         # IMPORTANT: Use shell=True because Claude CLI requires shell environment to work properly
         # This avoids the hanging issue that occurs with shell=False
@@ -50,10 +93,10 @@ class StreamingCLIClient:
         escaped_message = shlex.quote(message)
         if session_id:
             # Continue existing conversation
-            cmd = f'{self.cli_command} -r {shlex.quote(session_id)} -p {escaped_message} --output-format stream-json --verbose --permission-mode bypassPermissions'
+            cmd = f'{self.cli_command} -r {shlex.quote(session_id)} -p {escaped_message}{image_flags}{mcp_flags} --output-format stream-json --verbose --permission-mode bypassPermissions'
         else:
             # Start new conversation
-            cmd = f'{self.cli_command} -p {escaped_message} --output-format stream-json --verbose --permission-mode bypassPermissions'
+            cmd = f'{self.cli_command} -p {escaped_message}{image_flags}{mcp_flags} --output-format stream-json --verbose --permission-mode bypassPermissions'
 
         # Log working directory for isolation verification
         if project_path:
@@ -152,10 +195,27 @@ class StreamingCLIClient:
                 full_output = ''.join(full_text).strip()
                 if not full_output:
                     full_output = "⚠️ Output truncated due to size limit. Please continue with a follow-up message."
+                # Cleanup temp image files
+                self._cleanup_temp_files(temp_image_files)
                 return (full_output, pid, extracted_session_id, usage_data)
 
+            # Cleanup temp image files before raising
+            self._cleanup_temp_files(temp_image_files)
             # For other errors, still raise the exception
             raise Exception(f"Claude CLI error (exit code {process.returncode}): {error_msg}")
 
+        # Cleanup temp image files
+        self._cleanup_temp_files(temp_image_files)
+
         full_output = ''.join(full_text).strip()
         return (full_output, pid, extracted_session_id, usage_data)
+
+    def _cleanup_temp_files(self, temp_files: List[str]):
+        """Clean up temporary image files."""
+        for temp_path in temp_files:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    logger.debug(f"Cleaned up temp file: {temp_path}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp file {temp_path}: {e}")

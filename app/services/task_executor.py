@@ -43,97 +43,54 @@ class TaskExecutor:
         self.max_iterations = 20
         self.max_pauses = 5
 
+        # Import GitWorktreeManager for dynamic worktree creation
+        from app.services.git_worktree import GitWorktreeManager
+        self.git_worktree_manager_class = GitWorktreeManager
+
     async def execute_task(self, task_id: str):
         """
         Execute a task asynchronously.
 
+        Planning and worktree creation are now handled dynamically in _execute_with_claude,
+        so this method just sets up the initial project path and delegates execution.
+
         Args:
             task_id: ID of the task to execute
         """
-        print(f"🔥 EXECUTE_TASK DEBUG: Starting execution for task {task_id}")
+        print(f"🔧 Task {task_id}: Starting execution", flush=True)
+        logger.info(f"Task {task_id}: Starting execution")
         db = SessionLocal()
         try:
             task = db.query(Task).filter(Task.id == task_id).first()
             if not task:
-                print(f"🔥 EXECUTE_TASK DEBUG: Task {task_id} not found")
+                logger.error(f"Task {task_id}: Not found")
                 return
 
-            print(f"🔥 EXECUTE_TASK DEBUG: Found task {task.task_name}, current status: {task.status}")
+            logger.info(f"Task {task.id}: Found task '{task.task_name}', status: {task.status}")
 
-            # Update task status (only if not stopped)
+            # Update task status
             task.status = TaskStatus.RUNNING
             db.commit()
-            print(f"🔥 EXECUTE_TASK DEBUG: Updated task status to RUNNING")
 
-            # Get session for project context
-            session = db.query(Session).filter(Session.id == task.session_id).first()
+            # Determine initial project path (worktree creation happens dynamically in _execute_with_claude)
+            project_path = self._get_initial_project_path(db, task)
 
-            # Handle multi-project tasks with multiple worktrees
-            if hasattr(task, 'projects') and task.projects:
-                # Multi-project task: Use the main project's worktree as primary working directory
-                # Additional project worktrees are available through relative paths
-                project_path = self._get_primary_project_path(task, session)
-                logger.info(f"Task {task.id}: Multi-project task using primary path: {project_path}")
+            if not project_path:
+                task.status = TaskStatus.FAILED
+                task.error_message = "No valid project path found"
+                db.commit()
+                return
 
-                # Validate all project worktrees are accessible
-                validation_result = self._validate_multi_project_worktrees(task)
-                if not validation_result["success"]:
-                    task.status = TaskStatus.FAILED
-                    task.error_message = validation_result["error"]
-                    db.commit()
-                    return
+            print(f"📂 Task {task.id}: Initial project path: {project_path}", flush=True)
+            logger.info(f"Task {task.id}: Initial project path: {project_path}")
 
-            elif task.worktree_path:
-                # Single-project task with worktree isolation
-                # Validate that worktree path exists and is a valid directory
-                import os
-                if not os.path.exists(task.worktree_path) or not os.path.isdir(task.worktree_path):
-                    logger.error(f"Task {task.id}: Worktree path {task.worktree_path} does not exist or is not a directory")
-                    task.status = TaskStatus.FAILED
-                    task.error_message = f"Worktree path not found: {task.worktree_path}"
-                    db.commit()
-                    return
-                project_path = task.worktree_path
-
-                # Additional validation: verify the worktree is on the correct branch
-                try:
-                    import subprocess
-                    result = subprocess.run(
-                        ["git", "branch", "--show-current"],
-                        cwd=project_path,
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    current_branch = result.stdout.strip()
-                    if task.branch_name and current_branch != task.branch_name:
-                        logger.error(f"Task {task.id}: Worktree branch mismatch. Expected: {task.branch_name}, Current: {current_branch}")
-                        task.status = TaskStatus.FAILED
-                        task.error_message = f"Branch mismatch in worktree. Expected: {task.branch_name}, Current: {current_branch}"
-                        db.commit()
-                        return
-                    logger.info(f"Task {task.id}: Using worktree path for isolation: {project_path} (branch: {current_branch})")
-                except Exception as e:
-                    logger.warning(f"Task {task.id}: Could not verify branch in worktree: {e}")
-            else:
-                # Fallback to root_folder or session path for tasks without worktrees
-                # IMPORTANT FIX: Ensure we have a valid project path, not just "."
-                import os
-                if task.root_folder and os.path.exists(task.root_folder):
-                    project_path = task.root_folder
-                    logger.info(f"Task {task.id}: Using task root_folder as project path: {project_path}")
-                elif session and hasattr(session, 'project_path') and session.project_path and os.path.exists(session.project_path):
-                    project_path = session.project_path
-                    logger.info(f"Task {task.id}: Using session project_path: {project_path}")
-                else:
-                    # Last resort: Use current working directory, but this should be avoided
-                    project_path = "."
-                    logger.warning(f"Task {task.id}: No valid project path found, falling back to current directory (this may cause issues)")
-
-            # Execute the task with Claude
+            # Execute the task with Claude (planning and worktree handled inside)
+            print(f"🎬 Task {task.id}: Calling _execute_with_claude", flush=True)
             await self._execute_with_claude(db, task, project_path)
+            print(f"✅ Task {task.id}: _execute_with_claude completed", flush=True)
 
         except Exception as e:
+            logger.error(f"Task {task_id}: Execution failed: {e}")
             task = db.query(Task).filter(Task.id == task_id).first()
             if task:
                 task.status = TaskStatus.FAILED
@@ -142,14 +99,534 @@ class TaskExecutor:
         finally:
             db.close()
 
+    def _get_initial_project_path(self, db: DBSession, task: Task) -> Optional[str]:
+        """
+        Determine the initial project path for a task.
+
+        This is the starting point - worktree creation happens dynamically
+        in _execute_with_claude when write access is needed.
+
+        Args:
+            db: Database session
+            task: Task object
+
+        Returns:
+            Initial project path or None if not found
+        """
+        # Priority 1: Existing worktree (from previous execution or pre-created)
+        if task.worktree_path and os.path.exists(task.worktree_path):
+            logger.info(f"Task {task.id}: Using existing worktree: {task.worktree_path}")
+            return task.worktree_path
+
+        # Priority 2: Multi-project - use first project path
+        if hasattr(task, 'projects') and task.projects:
+            first_project = task.projects[0]
+            paths_str = first_project.get('path', '')
+            # Handle comma-separated paths
+            if ',' in paths_str:
+                project_path = paths_str.split(',')[0].strip()
+            else:
+                project_path = paths_str.strip()
+
+            if project_path and os.path.exists(project_path):
+                logger.info(f"Task {task.id}: Using first project path: {project_path}")
+                return project_path
+
+        # Priority 3: Task root_folder
+        if task.root_folder and os.path.exists(task.root_folder):
+            logger.info(f"Task {task.id}: Using root_folder: {task.root_folder}")
+            return task.root_folder
+
+        # Priority 4: Session project_path
+        if task.session_id:
+            session = db.query(Session).filter(Session.id == task.session_id).first()
+            if session and hasattr(session, 'project_path') and session.project_path:
+                if os.path.exists(session.project_path):
+                    logger.info(f"Task {task.id}: Using session project_path: {session.project_path}")
+                    return session.project_path
+
+        # Priority 5: Current directory (fallback)
+        logger.warning(f"Task {task.id}: No valid project path found, using current directory")
+        return "."
+
     async def _execute_with_claude(self, db: DBSession, task: Task, project_path: str):
         """
-        Execute task with Claude CLI, handling conversation and pauses.
+        Execute task with Claude CLI.
+
+        Flow:
+        For each user message:
+        1. PLANNING PHASE - Analyze the message to determine which projects need write access
+        2. WORKTREE SETUP - Create worktrees for projects needing modification (if not already created)
+        3. EXECUTION - Send the user message to Claude with the appropriate execution path
 
         Args:
             db: Database session
             task: Task to execute
-            project_path: Path to the project
+            project_path: Path to the project (may change to worktree)
+        """
+        print(f"🎯 Task {task.id}: _execute_with_claude started, project_path={project_path}")
+        iteration = 0
+        current_project_path = project_path  # Track current working path (may become worktree)
+
+        # Get ending criteria configuration (only for work mode)
+        end_criteria_config = task.end_criteria_config or {}
+        ending_criteria = end_criteria_config.get("criteria") if not task.chat_mode else None
+        max_iterations = end_criteria_config.get("max_iterations", self.max_iterations)
+        max_tokens = end_criteria_config.get("max_tokens")
+
+        # Track cumulative tokens
+        if task.total_tokens_used is None:
+            task.total_tokens_used = 0
+            db.commit()
+
+        # Check if this is first run (no existing interactions)
+        existing_interactions = db.query(ClaudeInteraction).filter(
+            ClaudeInteraction.task_id == task.id
+        ).count()
+        is_first_run = existing_interactions == 0
+        print(f"📋 Task {task.id}: is_first_run={is_first_run}, existing_interactions={existing_interactions}")
+
+        # Update current_project_path if worktree already exists (from previous run)
+        if task.worktree_path and os.path.exists(task.worktree_path):
+            current_project_path = task.worktree_path
+            print(f"📂 Task {task.id}: Using existing worktree path: {current_project_path}")
+
+        # ============================================================
+        # INITIAL CONTEXT (runs once at task start)
+        # Sends project info and tells Claude to wait for instructions
+        # Note: Worktree creation happens AFTER planning phase determines
+        # which repos need write access. If worktree is created, we clear
+        # the session and re-send context in the worktree.
+        # ============================================================
+        if is_first_run:
+            print(f"📨 Task {task.id}: Will send initial context")
+            await self._send_initial_context(db, task, current_project_path)
+
+        # ============================================================
+        # CHAT LOOP - Handle user messages with per-message planning
+        # ============================================================
+        last_response = ""
+        conversation_history = []
+
+        while iteration < max_iterations:
+            iteration += 1
+            logger.info(f"Task {task.id}: Starting iteration {iteration}")
+
+            # Check if task was stopped
+            db.refresh(task)
+            if task.status == TaskStatus.STOPPED:
+                logger.info(f"Task {task.id}: Task was stopped, breaking")
+                break
+
+            # Check if max tokens limit reached
+            if max_tokens and task.total_tokens_used >= max_tokens:
+                task.status = TaskStatus.EXHAUSTED
+                task.error_message = f"Max tokens limit reached: {task.total_tokens_used}/{max_tokens} tokens used"
+                db.commit()
+                break
+
+            # Get user message
+            user_message = None
+            user_images = None
+
+            pending_input, pending_images = self.user_input_manager.get_next_pending_user_input_with_images(db, task.id)
+            if pending_input:
+                self.user_input_manager.mark_message_as_sent(db, task.id, pending_input)
+                user_message = pending_input
+                user_images = pending_images
+                logger.info(f"Task {task.id}: Got user message: {user_message[:50]}...")
+
+                # Save user message IMMEDIATELY so it appears before planning phase
+                self._save_interaction(db, task.id, InteractionType.USER_REQUEST, user_message, images=user_images)
+                db.commit()
+            else:
+                # No user message, wait for input in chat mode or end in work mode
+                if task.chat_mode:
+                    logger.info(f"Task {task.id}: Chat mode - waiting for user input")
+                    break
+                else:
+                    logger.info(f"Task {task.id}: Work mode - no more input, ending")
+                    break
+
+            try:
+                # ============================================================
+                # PHASE 1: PLANNING - Determine which repos need write access
+                # ============================================================
+                logger.info(f"Task {task.id}: PHASE 1 - Planning for user message")
+
+                planning_result = await self._run_iteration_planning(
+                    db, task, current_project_path, user_message, iteration == 1
+                )
+
+                # ============================================================
+                # PHASE 2: WORKTREE SETUP - Create worktrees for ALL targets
+                # ============================================================
+                write_targets = planning_result.get('write_targets', [])
+                worktree_paths = []
+
+                if planning_result.get('needs_write') and write_targets:
+                    logger.info(f"Task {task.id}: PHASE 2 - Creating worktrees for {len(write_targets)} targets: {write_targets}")
+
+                    for write_target in write_targets:
+                        # Create worktree for each target
+                        worktree_path = await self._ensure_worktree_for_target(db, task, write_target)
+                        if worktree_path:
+                            worktree_paths.append(worktree_path)
+                            logger.info(f"Task {task.id}: Created worktree: {worktree_path}")
+
+                    # Set the first worktree as the primary execution path (for backward compat)
+                    if worktree_paths and not task.worktree_path:
+                        task.worktree_path = worktree_paths[0]
+                        current_project_path = worktree_paths[0]
+
+                        # ============================================================
+                        # CRITICAL: Clear session ID to force new session in worktree
+                        # The previous session was started in the original repo directory.
+                        # We must start a NEW session in the worktree directory so that
+                        # Claude CLI's working directory is correctly set to the worktree.
+                        # ============================================================
+                        old_session_id = task.claude_session_id
+                        task.claude_session_id = None
+                        db.commit()
+                        print(f"🔄 Task {task.id}: Worktree created, cleared session {old_session_id} to start fresh in worktree")
+                        logger.info(f"Task {task.id}: Cleared session {old_session_id} to start fresh in worktree {worktree_paths[0]}")
+
+                        # ============================================================
+                        # RE-SEND INITIAL CONTEXT in new session (in worktree)
+                        # This ensures the new session has all the project context
+                        # ============================================================
+                        print(f"📨 Task {task.id}: Re-sending initial context in worktree session")
+                        await self._send_initial_context(db, task, worktree_paths[0])
+
+                execution_path = task.worktree_path or current_project_path
+
+                # ============================================================
+                # PHASE 3: EXECUTION - Send user message to Claude
+                # ============================================================
+                logger.info(f"Task {task.id}: PHASE 3 - Executing user message")
+
+                # Build continue prompt with worktree info if created
+                if planning_result.get('needs_write') and worktree_paths:
+                    if len(worktree_paths) == 1:
+                        worktree_info = f"""Worktree created at: {worktree_paths[0]}
+Branch: {task.branch_name or 'task branch'}
+All file changes should be made in the worktree directory."""
+                    else:
+                        worktree_list = "\n".join([f"  - {wp}" for wp in worktree_paths])
+                        worktree_info = f"""Worktrees created for {len(worktree_paths)} repositories:
+{worktree_list}
+Branch: {task.branch_name or 'task branch'}
+All file changes should be made in the worktree directories."""
+
+                    # Save worktree info as system message so user can see it
+                    self._save_interaction(db, task.id, InteractionType.SYSTEM_MESSAGE, worktree_info)
+                    db.commit()
+
+                    continue_prompt = f"""{worktree_info}
+
+Now proceed with the original request:
+{user_message}"""
+                else:
+                    continue_prompt = user_message
+
+                # Note: User message already saved before planning phase
+
+                # Execute with streaming
+                response, pid, session_id, usage_data = await self._execute_iteration(
+                    db, task, execution_path, continue_prompt, user_images
+                )
+
+                # Clear images after first use
+                user_images = None
+
+                # Update task state
+                if session_id:
+                    task.claude_session_id = session_id
+                task.process_pid = pid
+                db.commit()
+
+                # Update token usage
+                if usage_data and 'usage' in usage_data:
+                    output_tokens = usage_data['usage'].get('output_tokens', 0)
+                    task.total_tokens_used = (task.total_tokens_used or 0) + output_tokens
+                    db.commit()
+
+                last_response = response
+                conversation_history.append(response)
+                is_first_iteration = False
+
+                # ============================================================
+                # PHASE 4: DECISION - Determine next action
+                # ============================================================
+                logger.info(f"Task {task.id}: PHASE 4 - Decision")
+
+                # Check ending criteria (work mode only)
+                if ending_criteria:
+                    try:
+                        criteria_met, reasoning = await self.criteria_analyzer.check_task_completion(
+                            ending_criteria=ending_criteria,
+                            task_description=task.description,
+                            conversation_history="\n\n".join(conversation_history[-3:]),
+                            latest_response=last_response
+                        )
+                        if criteria_met:
+                            task.summary = f"Task completed - Criteria met: {reasoning}"
+                            task.status = TaskStatus.FINISHED
+                            db.commit()
+                            break
+                    except Exception as e:
+                        logger.warning(f"Task {task.id}: Error checking criteria: {e}")
+
+                # Check for pending user input (always priority)
+                pending_input, pending_images = self.user_input_manager.get_next_pending_user_input_with_images(db, task.id)
+
+                if pending_input:
+                    # User input takes priority
+                    self.user_input_manager.mark_message_as_sent(db, task.id, pending_input)
+                    user_message = pending_input
+                    user_images = pending_images
+                    self._save_interaction(db, task.id, InteractionType.USER_REQUEST, user_message, images=user_images)
+                    logger.info(f"Task {task.id}: Processing user input: {user_message[:50]}...")
+                    continue  # Go to next iteration with user input
+
+                # CHAT MODE: Stop and wait for user input
+                if task.chat_mode:
+                    logger.info(f"Task {task.id}: Chat mode - waiting for user input")
+                    task.status = TaskStatus.PAUSED
+                    db.commit()
+                    break
+
+                # WORK MODE: Use intelligent responder to decide next action
+                if not self.intelligent_responder.should_continue_conversation(last_response, iteration, max_iterations):
+                    logger.info(f"Task {task.id}: Intelligent responder says conversation complete")
+                    task.summary = self._extract_summary(last_response)
+                    db.commit()
+                    break
+
+                # Generate auto-response for next iteration
+                user_message = self.intelligent_responder.generate_response(
+                    claude_response=last_response,
+                    task_description=task.description,
+                    iteration=iteration
+                )
+                self._save_interaction(db, task.id, InteractionType.SIMULATED_HUMAN, user_message)
+                logger.info(f"Task {task.id}: Generated auto-response: {user_message[:50]}...")
+
+            except Exception as e:
+                error_str = str(e)
+                logger.error(f"Task {task.id}: Error in iteration {iteration}: {error_str}")
+
+                # Check for recoverable errors
+                if "Separator is found, but chunk is longer than limit" in error_str:
+                    logger.warning(f"Task {task.id}: Chunk size limit - continuing")
+                    task.error_message = f"Error during execution: {error_str}"
+                    db.commit()
+                    continue
+
+                task.error_message = f"Error during execution: {error_str}"
+                task.status = TaskStatus.FAILED
+                db.commit()
+                break
+
+        # Post-loop processing
+        if iteration >= max_iterations and task.status == TaskStatus.RUNNING:
+            task.status = TaskStatus.EXHAUSTED
+            task.error_message = f"Max iterations reached: {iteration}/{max_iterations}"
+            db.commit()
+        elif task.chat_mode and task.status == TaskStatus.RUNNING:
+            # Chat mode ended loop waiting for user input - set to PAUSED
+            task.status = TaskStatus.PAUSED
+            db.commit()
+            logger.info(f"Task {task.id}: Chat mode - set status to PAUSED, waiting for user input")
+
+        # Extract summary if not set
+        if not task.summary:
+            last_responses = db.query(ClaudeInteraction).filter(
+                ClaudeInteraction.task_id == task.id,
+                ClaudeInteraction.interaction_type == InteractionType.CLAUDE_RESPONSE
+            ).all()
+            if last_responses:
+                task.summary = self._extract_summary(last_responses[-1].content)
+                db.commit()
+
+        # Run tests for completed work mode tasks
+        if not task.chat_mode and task.status in [TaskStatus.FINISHED, TaskStatus.COMPLETED, TaskStatus.EXHAUSTED]:
+            await self._generate_and_run_tests(db, task, current_project_path)
+
+    async def _send_initial_context(self, db: DBSession, task: Task, project_path: str):
+        """
+        Send initial context message when task starts.
+
+        This provides Claude with information about all available projects
+        and tells it to wait for user instructions.
+
+        Args:
+            db: Database session
+            task: Task object
+            project_path: Current working directory
+        """
+        print(f"📨 Task {task.id}: Sending initial context message")
+        logger.info(f"Task {task.id}: Sending initial context message")
+
+        # Build context message with all projects info
+        context_parts = []
+
+        # Task info
+        context_parts.append(f"Task: {task.task_name}")
+        if task.description:
+            context_parts.append(f"Description: {task.description}")
+
+        # Project information
+        if task.projects:
+            context_parts.append("\n## Available Projects/Repositories:")
+            for i, proj in enumerate(task.projects, 1):
+                path = proj.get('path', 'unknown')
+                description = proj.get('context', 'No description provided')
+                access = proj.get('access', 'read')
+
+                context_parts.append(f"\n[{i}] {path}")
+                context_parts.append(f"    Description: {description}")
+                context_parts.append(f"    Access: {access}")
+
+                # Add IDL/PSM info if available
+                psm = proj.get('psm')
+                if psm:
+                    context_parts.append(f"    PSM: {psm}")
+                idl_repo = proj.get('idl_repo')
+                if idl_repo:
+                    context_parts.append(f"    IDL Repo: {idl_repo}")
+        else:
+            context_parts.append(f"\nWorking Directory: {project_path}")
+
+        # Instructions to wait - CRITICAL: Tell Claude not to explore proactively
+        context_parts.append("\n## Instructions")
+        context_parts.append("IMPORTANT: Do NOT explore or read any files proactively.")
+        context_parts.append("Do NOT use any tools until the user gives you a specific request.")
+        context_parts.append("Simply acknowledge this context and wait for user instructions.")
+        context_parts.append("Reply with a brief acknowledgment only.")
+
+        initial_message = "\n".join(context_parts)
+
+        try:
+            # Save initial context as SYSTEM_MESSAGE so frontend can display it while Claude processes
+            self._save_interaction(db, task.id, InteractionType.SYSTEM_MESSAGE, initial_message)
+            db.commit()
+            print(f"💬 Task {task.id}: Initial context saved, sending to Claude...", flush=True)
+
+            # Send to Claude
+            print(f"📤 Task {task.id}: Calling streaming_client.send_message_streaming...", flush=True)
+            response, pid, session_id, usage_data = await self.streaming_client.send_message_streaming(
+                message=initial_message,
+                project_path=project_path,
+                session_id=task.claude_session_id,
+                mcp_servers=task.mcp_servers,
+            )
+            print(f"📥 Task {task.id}: Got response from streaming_client", flush=True)
+
+            # Update session info
+            if session_id:
+                task.claude_session_id = session_id
+            task.process_pid = pid
+            db.commit()
+
+            # Save Claude's response
+            self._save_interaction(db, task.id, InteractionType.CLAUDE_RESPONSE, response, usage_data)
+
+            # Update token usage
+            if usage_data and 'usage' in usage_data:
+                output_tokens = usage_data['usage'].get('output_tokens', 0)
+                task.total_tokens_used = (task.total_tokens_used or 0) + output_tokens
+                db.commit()
+
+            print(f"✅ Task {task.id}: Initial context sent successfully", flush=True)
+            logger.info(f"Task {task.id}: Initial context sent successfully")
+
+        except Exception as e:
+            print(f"❌ Task {task.id}: Failed to send initial context: {e}", flush=True)
+            logger.error(f"Task {task.id}: Failed to send initial context: {e}")
+            # Don't fail the task - just log and continue
+
+    async def _execute_iteration(self, db: DBSession, task: Task, project_path: str,
+                                  message: str, images: list = None) -> tuple:
+        """
+        Execute a single iteration - send message to Claude and get response.
+
+        Args:
+            db: Database session
+            task: Task object
+            project_path: Working directory for Claude
+            message: Message to send
+            images: Optional list of images
+
+        Returns:
+            Tuple of (response, pid, session_id, usage_data)
+        """
+        task.status = TaskStatus.RUNNING
+        db.commit()
+
+        # Event handler for real-time saves
+        def handle_event(event: dict):
+            event_type = event.get('type')
+
+            if event_type == 'assistant':
+                message_data = event.get('message', {})
+                content = message_data.get('content', [])
+                text_parts = []
+                tool_uses = []
+
+                for block in content:
+                    if block.get('type') == 'text':
+                        text_parts.append(block.get('text', ''))
+                    elif block.get('type') == 'tool_use':
+                        tool_uses.append(block)
+
+                if text_parts or tool_uses:
+                    content_str = '\n'.join(text_parts) if text_parts else f"[Tool use: {len(tool_uses)} tools]"
+                    self._save_interaction(db, task.id, InteractionType.CLAUDE_RESPONSE, content_str)
+
+            elif event_type == 'user':
+                message_data = event.get('message', {})
+                content = message_data.get('content', [])
+                tool_results = []
+
+                for block in content:
+                    if block.get('type') == 'tool_result':
+                        tool_id = block.get('tool_use_id', 'unknown')
+                        is_error = block.get('is_error', False)
+                        result_content = block.get('content', [])
+                        result_texts = []
+
+                        for result_block in result_content:
+                            if isinstance(result_block, dict) and result_block.get('type') == 'text':
+                                result_texts.append(result_block.get('text', ''))
+                            elif isinstance(result_block, str):
+                                result_texts.append(result_block)
+
+                        full_result_text = ''.join(result_texts)
+                        if is_error:
+                            tool_results.append(f"Tool {tool_id} ERROR:\n{full_result_text}")
+                        else:
+                            tool_results.append(f"Tool {tool_id}:\n{full_result_text}")
+
+                if tool_results:
+                    self._save_interaction(db, task.id, InteractionType.TOOL_RESULT, '\n\n'.join(tool_results))
+
+        # Send message via streaming client
+        response, pid, session_id, usage_data = await self.streaming_client.send_message_streaming(
+            message=message,
+            project_path=project_path,
+            output_callback=None,
+            session_id=task.claude_session_id,
+            event_callback=handle_event,
+            images=images,
+            mcp_servers=task.mcp_servers,
+        )
+
+        return response, pid, session_id, usage_data
+
+    async def _execute_with_claude_legacy(self, db: DBSession, task: Task, project_path: str):
+        """
+        Legacy execution method - kept for reference.
         """
         iteration = 0
         pause_count = 0
@@ -174,162 +651,90 @@ class TaskExecutor:
             db.commit()
 
         # Get project context (using simple file-based fallback)
-        # CRITICAL: Only provide the working directory path to Claude (worktree for isolation)
-        # Never expose the main repository path to prevent cross-branch contamination
         project_context = self._get_project_context(project_path, task)
 
-        # Build comprehensive initial message with task description, project context, and ending criteria
+        # Build comprehensive initial message
         initial_message = self._build_comprehensive_initial_message(task, project_context)
 
-        # ALWAYS check for pending user input at startup (both new tasks and restarts)
-        print(f"🔍 STARTUP DEBUG: Checking for pending user input for task {task.id}")
-
-        # Use new status-based deduplication: only process messages that haven't been sent yet
-        user_input = self.user_input_manager.get_next_pending_user_input(db, task.id)
-        print(f"🔍 STARTUP DEBUG: get_next_pending_user_input returned: {user_input}")
+        # Check for pending user input at startup
+        user_input, user_images = self.user_input_manager.get_next_pending_user_input_with_images(db, task.id)
 
         if user_input:
-            # User input takes priority - process it immediately
-            print(f"🔍 STARTUP DEBUG: Found pending user input, processing: {user_input[:50]}...")
-            logger.info(f"Task {task.id}: Processing pending user input at startup: {user_input[:50]}...")
-
-            # CRITICAL: Mark message as sent BEFORE sending to Claude to prevent duplicates
             self.user_input_manager.mark_message_as_sent(db, task.id, user_input)
-
-            # Save as USER_REQUEST interaction
-            self._save_interaction(db, task.id, InteractionType.USER_REQUEST, user_input)
-            # Use user input as the message to send
+            self._save_interaction(db, task.id, InteractionType.USER_REQUEST, user_input, images=user_images)
+            db.commit()  # Commit immediately so frontend can display
             initial_message = user_input
-            is_first_message = True  # Always treat user input as the first message
-            print(f"🔍 STARTUP DEBUG: Set user input as first message")
+            is_first_message = True
         elif is_first_message:
-            # No user input and this is a new task - send initial task description
-            self._save_interaction(
-                db, task.id, InteractionType.USER_REQUEST, initial_message
-            )
-            logger.info(f"Task {task.id}: Saved initial interaction for new task")
-            print(f"🔍 STARTUP DEBUG: No user input found, using initial task message")
+            self._save_interaction(db, task.id, InteractionType.USER_REQUEST, initial_message)
+            db.commit()  # Commit immediately so frontend can display
         else:
-            # No user input and this is a restart - skip initial message
-            logger.info(f"Task {task.id}: Skipping initial interaction - task restart with no user input")
-            print(f"🔍 STARTUP DEBUG: No user input found on restart, skipping initial message")
-            # Set a flag to skip the first iteration
             is_first_message = False
 
         last_response = ""
-        conversation_history = []  # Track conversation for criteria checking
+        conversation_history = []
+        images_to_send = user_images
 
         while iteration < max_iterations:
             iteration += 1
-            print(f"🔥 TASK EXECUTOR DEBUG: Starting iteration {iteration} for task {task.id}")
 
-            # Check if task was stopped
             db.refresh(task)
             if task.status == TaskStatus.STOPPED:
-                print(f"🔥 TASK EXECUTOR DEBUG: Task {task.id} was stopped, breaking")
                 break
 
-            # Check if max tokens limit reached
             if max_tokens and task.total_tokens_used >= max_tokens:
                 task.status = TaskStatus.EXHAUSTED
-                task.error_message = f"Max tokens limit reached: {task.total_tokens_used}/{max_tokens} tokens used"
+                task.error_message = f"Max tokens limit reached"
                 db.commit()
                 break
 
             try:
-                # Send message to Claude CLI
                 if is_first_message:
                     message_to_send = initial_message
                     is_first_message = False
                 else:
-                    # CRITICAL FIX: Always check for user input first before deciding to stop
-                    db.refresh(task)  # Refresh to get latest state
+                    db.refresh(task)
                     has_pending_user_input = self.user_input_manager.has_pending_input(db, task.id)
 
-                    logger.info(f"Task {task.id} iteration {iteration}: pending_user_input={has_pending_user_input}")
-
-                    # CHAT MODE: After Claude responds, stop and wait for user input
-                    # (unless there's already pending user input to process)
                     if task.chat_mode and not has_pending_user_input:
-                        logger.info(f"Task {task.id}: Chat mode - Claude responded, now waiting for user input")
                         task.status = TaskStatus.PAUSED
                         db.commit()
-                        break  # Stop here - user needs to send next message
+                        break
 
-                    # If no user input is pending, check if we should continue based on last response
                     if not has_pending_user_input and not self.intelligent_responder.should_continue_conversation(
                         last_response, iteration, self.max_iterations
                     ):
-                        logger.info(f"Task {task.id}: No user input pending and should not continue conversation - breaking")
                         break
 
-                    if has_pending_user_input:
-                        logger.info(f"Task {task.id}: User input pending - forcing continuation to process input")
-
-                    # Use intelligent responder to generate context-aware reply
                     if pause_count < self.max_pauses:
                         task.status = TaskStatus.PAUSED
                         db.commit()
-
-                        # Wait a bit to simulate human thinking
                         await asyncio.sleep(1)
+                        db.refresh(task)
 
-                        # HIGH PRIORITY: Check for user input first (never overlook user input)
-                        db.refresh(task)  # Refresh to get latest state
-
-                        logger.info(f"Task {task.id}: Checking for user input in pause cycle")
-
-                        # Use new status-based deduplication: only process messages that haven't been sent yet
-                        user_input = self.user_input_manager.get_next_pending_user_input(db, task.id)
+                        user_input, user_images = self.user_input_manager.get_next_pending_user_input_with_images(db, task.id)
 
                         if user_input:
-                            logger.info(f"Task {task.id}: Found pending user input in queue: {user_input[:50]}...")
-                            # CRITICAL: Mark message as sent BEFORE sending to Claude to prevent duplicates
                             self.user_input_manager.mark_message_as_sent(db, task.id, user_input)
-                        else:
-                            logger.info(f"Task {task.id}: No pending user input found in queue")
-
-                        # Fallback to legacy custom_human_input for backward compatibility
-                        if not user_input and task.custom_human_input:
-                            user_input = task.custom_human_input
-                            task.custom_human_input = None
-                            db.commit()
-
-                        if user_input:
-                            # USER INPUT TAKES ABSOLUTE PRIORITY
                             human_prompt = user_input
-
-                            # Save as REAL human interaction
-                            self.user_input_manager.save_user_interaction(
-                                db, task.id, human_prompt
-                            )
-
-                            logger.info(f"Processing user input for task {task.id}: {human_prompt[:50]}...")
+                            current_images = user_images
+                            self._save_interaction(db, task.id, InteractionType.USER_REQUEST, human_prompt, images=user_images)
+                            db.commit()  # Commit immediately so frontend can display
                         elif task.chat_mode:
-                            # CHAT MODE: Stop and wait for user input, do NOT auto-respond
-                            logger.info(f"Task {task.id}: Chat mode enabled - stopping and waiting for user input (no auto-response)")
-                            # Keep status as PAUSED and break out of the loop
-                            # Task will be resumed when user sends next message
                             task.status = TaskStatus.PAUSED
                             db.commit()
-                            break  # Exit the execution loop - wait for user to send next message
+                            break
                         else:
-                            # Only generate simulated human if NO user input is pending
                             human_prompt = self.intelligent_responder.generate_response(
                                 claude_response=last_response,
                                 task_description=task.description,
                                 iteration=iteration
                             )
-
-                            # Save simulated human interaction
-                            self._save_interaction(
-                                db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt
-                            )
-
-                            logger.info(f"Generated simulated human input for task {task.id}: {human_prompt[:50]}...")
+                            current_images = None
+                            self._save_interaction(db, task.id, InteractionType.SIMULATED_HUMAN, human_prompt)
 
                         message_to_send = human_prompt
-
+                        images_to_send = current_images
                         task.status = TaskStatus.RUNNING
                         db.commit()
                         pause_count += 1
@@ -337,191 +742,17 @@ class TaskExecutor:
                         # Max pauses reached, stop
                         break
 
-                # Get Claude's response via CLI (using streaming client)
-                # Save events to DB in real-time as they arrive
-                def handle_event(event: dict):
-                    """Process and save stream events in real-time."""
-                    event_type = event.get('type')
-                    print(f"🔥 HANDLE_EVENT DEBUG: Received event type: {event_type}, event: {event}")
-                    logger.info(f"HANDLE_EVENT: Received event type: {event_type}")
-
-                    # Save assistant messages (Claude's responses)
-                    if event_type == 'assistant':
-                        print(f"🔥 HANDLE_EVENT DEBUG: Processing assistant event")
-                        message_data = event.get('message', {})
-                        content = message_data.get('content', [])
-                        print(f"🔥 HANDLE_EVENT DEBUG: message_data: {message_data}")
-                        print(f"🔥 HANDLE_EVENT DEBUG: content: {content}")
-
-                        # Extract text and tool uses from content
-                        text_parts = []
-                        tool_uses = []
-                        for block in content:
-                            if block.get('type') == 'text':
-                                text_parts.append(block.get('text', ''))
-                            elif block.get('type') == 'tool_use':
-                                tool_uses.append(block)
-
-                        print(f"🔥 HANDLE_EVENT DEBUG: text_parts: {text_parts}")
-                        print(f"🔥 HANDLE_EVENT DEBUG: tool_uses: {tool_uses}")
-
-                        # Save as interaction if there's text or tool use
-                        if text_parts or tool_uses:
-                            content_str = '\n'.join(text_parts) if text_parts else f"[Tool use: {len(tool_uses)} tools]"
-                            print(f"🔥 HANDLE_EVENT DEBUG: Saving interaction with content: {content_str[:100]}...")
-                            self._save_interaction(
-                                db, task.id, InteractionType.CLAUDE_RESPONSE, content_str
-                            )
-                            print(f"🔥 HANDLE_EVENT DEBUG: Interaction saved successfully")
-                        else:
-                            print(f"🔥 HANDLE_EVENT DEBUG: No text or tool use found, skipping interaction save")
-
-                    # Save user messages (tool results)
-                    elif event_type == 'user':
-                        message_data = event.get('message', {})
-                        content = message_data.get('content', [])
-
-                        # Extract tool results
-                        tool_results = []
-                        for block in content:
-                            if block.get('type') == 'tool_result':
-                                tool_id = block.get('tool_use_id', 'unknown')
-                                is_error = block.get('is_error', False)
-                                result_content = block.get('content', [])
-
-                                # Collect all text from result content blocks
-                                result_texts = []
-                                for result_block in result_content:
-                                    if isinstance(result_block, dict) and result_block.get('type') == 'text':
-                                        result_texts.append(result_block.get('text', ''))
-                                    elif isinstance(result_block, str):
-                                        # Sometimes content is just a string
-                                        result_texts.append(result_block)
-
-                                # Join with empty string instead of newlines to fix vertical text issue
-                                full_result_text = ''.join(result_texts)
-
-                                # Format the tool result with tool_id and full content
-                                if is_error:
-                                    tool_results.append(f"Tool {tool_id} ERROR:\n{full_result_text}")
-                                else:
-                                    tool_results.append(f"Tool {tool_id}:\n{full_result_text}")
-
-                        if tool_results:
-                            self._save_interaction(
-                                db, task.id, InteractionType.TOOL_RESULT, '\n\n'.join(tool_results)
-                            )
-
-                # Use streaming client with event callback for real-time DB saves
-                print(f"🔥 TASK EXECUTOR DEBUG: About to call streaming client for task {task.id}")
-                print(f"🔥 TASK EXECUTOR DEBUG: message_to_send: {message_to_send[:100]}...")
-                print(f"🔥 TASK EXECUTOR DEBUG: project_path: {project_path}")
-                print(f"🔥 TASK EXECUTOR DEBUG: session_id: {task.claude_session_id}")
-
-                response, pid, returned_session_id, usage_data = await self.streaming_client.send_message_streaming(
-                    message=message_to_send,
-                    project_path=project_path,
-                    output_callback=None,
-                    session_id=task.claude_session_id,  # Pass existing session_id or None for first message
-                    event_callback=handle_event,  # Process events in real-time
-                )
-
-                print(f"🔥 TASK EXECUTOR DEBUG: Streaming client returned, response length: {len(response) if response else 0}")
-                print(f"🔥 TASK EXECUTOR DEBUG: PID: {pid}, session_id: {returned_session_id}")
-
-                # Store PID and session_id for process management and conversation continuity
-                task.process_pid = pid
-                if returned_session_id:
-                    task.claude_session_id = returned_session_id
-                    print(f"🔍 TASK EXECUTOR DEBUG: task_id={task.id}, set claude_session_id={returned_session_id}")
-                    logger.info(f"Task executor set claude_session_id: {returned_session_id} for task {task.id}")
-                db.commit()
-
-                # Track cumulative output tokens from usage data
-                if usage_data and 'usage' in usage_data:
-                    output_tokens = usage_data['usage'].get('output_tokens', 0)
-                    task.total_tokens_used = (task.total_tokens_used or 0) + output_tokens
-                    db.commit()
-
-                # Note: We no longer save the final response here since interactions
-                # are saved in real-time via the event_callback
-
-                # Store for next iteration
-                last_response = response
-                conversation_history.append(response)
-
-                # Check if task meets ending criteria (if defined)
-                criteria_met = False
-                if ending_criteria:
-                    try:
-                        # Check if ending criteria is met
-                        criteria_met, reasoning = await self.criteria_analyzer.check_task_completion(
-                            ending_criteria=ending_criteria,
-                            task_description=task.description,
-                            conversation_history="\n\n".join(conversation_history[-3:]),  # Last 3 responses
-                            latest_response=last_response
-                        )
-
-                        if criteria_met:
-                            task.summary = f"Task completed - Criteria met: {reasoning}"
-                            task.status = TaskStatus.FINISHED
-                            db.commit()
-                            break
-                    except Exception as e:
-                        print(f"Error checking ending criteria: {e}")
-
-                # Fallback: Check if task seems complete using old heuristic
-                # CRITICAL: Don't mark task as complete if user input is pending
-                has_pending_user_input = self.user_input_manager.has_pending_input(db, task.id)
-                if not criteria_met and not has_pending_user_input and self._is_task_complete(response):
-                    task.summary = self._extract_summary(response)
-                    db.commit()
-                    break
-                elif has_pending_user_input:
-                    logger.info(f"Task {task.id}: Not marking as complete - user input pending")
-
             except Exception as e:
-                error_str = str(e)
-
-                # Check for recoverable chunk size limit errors
-                if "Separator is found, but chunk is longer than limit" in error_str:
-                    logger.warning(f"Task {task.id}: Chunk size limit reached - setting error message but continuing")
-                    task.error_message = f"Error during execution: {error_str}"
-                    db.commit()
-                    # Don't break - let the task continue with the next iteration
-                    continue
-
-                # For all other errors, set error and break
-                task.error_message = f"Error during execution: {error_str}"
+                task.error_message = f"Error during execution: {str(e)}"
+                task.status = TaskStatus.FAILED
                 db.commit()
                 break
 
-        # Check if loop ended due to hitting max iterations
+        # Post-loop processing for legacy method
         if iteration >= max_iterations and task.status == TaskStatus.RUNNING:
-            # Max iterations reached without completing
             task.status = TaskStatus.EXHAUSTED
-            task.error_message = f"Max iterations limit reached: {iteration}/{max_iterations} iterations completed without meeting ending criteria"
+            task.error_message = f"Max iterations reached"
             db.commit()
-
-        # If no summary yet, try to extract from last response
-        if not task.summary:
-            # Get last Claude response
-            last_responses = [i for i in db.query(ClaudeInteraction).filter(
-                ClaudeInteraction.task_id == task.id,
-                ClaudeInteraction.interaction_type == InteractionType.CLAUDE_RESPONSE
-            ).all()]
-            if last_responses:
-                task.summary = self._extract_summary(last_responses[-1].content)
-                db.commit()
-
-        # Generate and run tests only if task is complete and no user input is pending
-        has_pending_user_input = self.user_input_manager.has_pending_input(db, task.id)
-        if not has_pending_user_input and task.status in [TaskStatus.FINISHED, TaskStatus.COMPLETED, TaskStatus.EXHAUSTED]:
-            await self._generate_and_run_tests(db, task, project_path)
-        elif has_pending_user_input:
-            logger.info(f"Task {task.id}: Skipping test generation - user input pending")
-        else:
-            logger.info(f"Task {task.id}: Task not finished (status: {task.status}) - skipping test generation")
 
     def _build_comprehensive_initial_message(self, task, project_context: str) -> str:
         """
@@ -538,8 +769,9 @@ class TaskExecutor:
         # Add project context (includes working directory and project descriptions)
         message += project_context
 
-        # Add ending criteria if configured
-        if hasattr(task, 'end_criteria_config') and task.end_criteria_config:
+        # Add ending criteria if configured (skip for chat mode - it's interactive)
+        is_chat_mode = hasattr(task, 'chat_mode') and task.chat_mode
+        if not is_chat_mode and hasattr(task, 'end_criteria_config') and task.end_criteria_config:
             end_criteria_config = task.end_criteria_config
 
             # Build ending criteria section
@@ -561,14 +793,438 @@ class TaskExecutor:
             if criteria_text != "\n\nEnding Criteria:\n":
                 message += criteria_text
 
-        # Add standard closing instructions
-        message += "\n\nPlease implement this task. You have permissions for file operations and testing. When complete, provide a summary."
-
-        # Chat mode: Add instruction to not auto-commit
-        if hasattr(task, 'chat_mode') and task.chat_mode:
+        # Add closing instructions based on mode
+        if is_chat_mode:
             message += "\n\nIMPORTANT: This is an interactive chat session. Do NOT automatically commit changes. Make the code changes but let the user review and decide when to commit."
+        else:
+            message += "\n\nPlease implement this task. You have permissions for file operations and testing. When complete, provide a summary."
 
         return message
+
+    async def _run_iteration_planning(self, db: DBSession, task: Task, project_path: str,
+                                       user_message: str, is_first_iteration: bool) -> dict:
+        """
+        Run planning phase for an iteration to determine if code changes are needed.
+
+        Args:
+            db: Database session
+            task: Task object
+            project_path: Current working directory
+            user_message: The user's message/request for this iteration
+            is_first_iteration: Whether this is the first iteration
+
+        Returns:
+            dict with keys:
+                - needs_write: bool - whether code changes are needed
+                - write_target: str - path to repo that needs write access (if any)
+                - plan_response: str - Claude's planning response
+                - continue_prompt: str - prompt to continue execution
+        """
+        logger.info(f"Task {task.id}: Running iteration planning phase")
+
+        # Build projects info from task.projects
+        projects_info = ""
+        projects_list = ""
+        if task.projects:
+            for i, proj in enumerate(task.projects, 1):
+                path = proj.get('path', 'unknown')
+                context = proj.get('context', 'No description')
+                access = proj.get('access', 'read')
+                projects_info += f"[{i}] {path}\n    Description: {context}\n    Current Access: {access}\n\n"
+                projects_list += f"[{i}] {path}\n"
+        else:
+            # Fallback to single project path
+            projects_info = f"[1] {project_path}\n    Description: Main project\n    Current Access: read\n\n"
+            projects_list = f"[1] {project_path}\n"
+
+        # Build planning prompt - supports multiple write targets
+        if is_first_iteration:
+            planning_prompt = f"""PLANNING PHASE - Before starting work, analyze this request.
+
+Request: {user_message}
+
+Available Projects/Repositories:
+{projects_info}
+Please analyze this request and determine:
+1. Does this request require making code changes (creating, editing, or deleting files)?
+2. If yes, which project(s) will need to be modified?
+
+Respond with your analysis in this EXACT format:
+```planning
+NEEDS_WRITE: YES or NO
+WRITE_TARGETS: [numbers separated by comma, e.g., 1, 2, 3] or NONE
+```
+
+Available project numbers:
+{projects_list}
+After the planning block, briefly explain your reasoning and provide an implementation plan.
+Do NOT make any file changes yet - this is only the planning phase."""
+        else:
+            # Implementation Prompt - for subsequent iterations after initial planning
+            planning_prompt = f"""IMPLEMENTATION PHASE - Continue with the task.
+
+Previous context: We are working on a task. Now proceeding with implementation.
+
+Current request/context: {user_message}
+
+Available Projects/Repositories:
+{projects_info}
+Current worktrees: {task.worktree_path or 'None (using main repo)'}
+
+IMPORTANT IMPLEMENTATION RULES:
+
+1. DATABASE SCHEMA CHANGES:
+   If your changes require database schema modifications (new tables, columns, indexes, etc.):
+   - Generate migration SQL files under the RPC project's `sql/` folder
+   - Use incremental migration naming (e.g., `001_create_table.sql`, `002_add_column.sql`)
+   - Include both UP and DOWN migrations when applicable
+
+2. IDL CHANGES (Thrift/Proto files):
+   If your changes require IDL modifications:
+   - Make the IDL changes in the IDL repository first
+   - Commit and push the IDL changes to the IDL repo's default branch
+   - WAIT for the overpass auto-generation to complete (typically takes 1-2 minutes)
+   - Then in the RPC/SDK projects, run: `go get -v <overpass_module>@<default_branch>`
+     Example: `go get -v code.byted.org/oec/rpcv2_xxx@feat/asbot`
+   - Only after the dependency is updated can the RPC/SDK projects be built successfully
+
+3. BUILD ORDER for cross-project changes:
+   IDL changes → Push IDL → Wait for overpass → Update go.mod in RPC/SDK → Build RPC/SDK
+
+4. RPC/BACKEND UNIT TESTING:
+   After the RPC module is built successfully:
+   - Create unit test cases for the new functionality (test the backend logic)
+   - Place test files in the appropriate `_test.go` files near the code being tested
+   - Run the NEW tests first to verify they pass: `go test -v -tags local -run TestNewFunction ./...`
+   - Then run ALL existing tests to ensure no regressions: `go test -v -tags local ./...`
+   - Use `-tags local` flag for local mode testing
+   - Fix any failing tests before considering the implementation complete
+
+5. COMPLETION CHECKLIST:
+   Before marking the task complete, ensure:
+   - [ ] Code compiles without errors
+   - [ ] New unit tests created and passing
+   - [ ] All existing unit tests still passing
+   - [ ] Migration SQL generated (if DB changes)
+   - [ ] IDL changes committed and pushed (if IDL changes)
+
+Does continuing this work require making code changes?
+
+Respond with:
+```planning
+NEEDS_WRITE: YES or NO
+WRITE_TARGETS: [numbers separated by comma] or NONE or CURRENT
+```
+
+Available project numbers:
+{projects_list}
+Brief explanation, then proceed with implementation."""
+
+        try:
+            # Save planning message as SYSTEM_MESSAGE (not user message)
+            self._save_interaction(db, task.id, InteractionType.SYSTEM_MESSAGE, planning_prompt)
+            db.commit()
+
+            # Send planning message to Claude
+            response, pid, session_id, usage_data = await self.streaming_client.send_message_streaming(
+                message=planning_prompt,
+                project_path=project_path,
+                session_id=task.claude_session_id,
+                mcp_servers=task.mcp_servers,
+            )
+
+            # Update session info
+            if session_id:
+                task.claude_session_id = session_id
+            task.process_pid = pid
+            db.commit()
+
+            # Save Claude's response
+            self._save_interaction(db, task.id, InteractionType.CLAUDE_RESPONSE, response, usage_data)
+
+            # Update token usage
+            if usage_data and 'usage' in usage_data:
+                output_tokens = usage_data['usage'].get('output_tokens', 0)
+                task.total_tokens_used = (task.total_tokens_used or 0) + output_tokens
+                db.commit()
+
+            # Parse planning response - now supports multiple write targets
+            needs_write = False
+            write_targets = []  # List of paths that need write access
+            write_target_nums = []  # List of project numbers
+
+            # Build projects lookup for number-to-path conversion
+            projects_lookup = {}
+            if task.projects:
+                for i, proj in enumerate(task.projects, 1):
+                    projects_lookup[i] = proj.get('path', '')
+
+            # Look for planning block
+            pattern = r'```planning\s*(.*?)\s*```'
+            match = re.search(pattern, response, re.DOTALL | re.IGNORECASE)
+
+            if match:
+                planning_text = match.group(1).strip()
+
+                # Parse NEEDS_WRITE
+                needs_write_match = re.search(r'NEEDS_WRITE:\s*(YES|NO)', planning_text, re.IGNORECASE)
+                if needs_write_match:
+                    needs_write = needs_write_match.group(1).upper() == 'YES'
+
+                # Parse WRITE_TARGETS (plural) - can be comma-separated numbers, NONE, or CURRENT
+                # Also support legacy WRITE_TARGET (singular)
+                write_target_match = re.search(r'WRITE_TARGETS?:\s*(.+)', planning_text, re.IGNORECASE)
+                if write_target_match:
+                    target_str = write_target_match.group(1).strip()
+
+                    # Check for NONE or CURRENT
+                    if target_str.upper() == 'NONE':
+                        write_targets = []
+                    elif target_str.upper() == 'CURRENT' and task.worktree_path:
+                        # Use existing worktrees
+                        write_targets = [task.worktree_path]
+                    else:
+                        # Parse comma-separated numbers (e.g., "1, 2, 3" or "1,2,3" or "[1], [2]")
+                        # Find all numbers in the string
+                        numbers = re.findall(r'\d+', target_str)
+                        for num_str in numbers:
+                            num = int(num_str)
+                            if num in projects_lookup:
+                                path = projects_lookup[num]
+                                if path and path not in write_targets:
+                                    write_targets.append(path)
+                                    write_target_nums.append(num)
+                                    logger.info(f"Task {task.id}: Write target {num} -> {path}")
+                            else:
+                                logger.warning(f"Task {task.id}: Invalid project number {num}")
+            else:
+                # Fallback: look for keywords indicating write intent
+                response_lower = response.lower()
+                write_keywords = ['create', 'edit', 'modify', 'update', 'write', 'add', 'delete', 'change', 'implement']
+                needs_write = any(keyword in response_lower for keyword in write_keywords)
+                if needs_write:
+                    write_targets = [task.root_folder or project_path]
+
+            logger.info(f"Task {task.id}: Planning result - needs_write={needs_write}, write_targets={write_targets}")
+
+            # Return results with both singular (for backward compat) and plural
+            return {
+                'needs_write': needs_write,
+                'write_target': write_targets[0] if write_targets else None,  # First target for backward compat
+                'write_targets': write_targets,  # All targets
+                'write_target_nums': write_target_nums,
+                'plan_response': response,
+                'continue_prompt': None  # Will be set after worktree creation
+            }
+
+        except Exception as e:
+            logger.error(f"Task {task.id}: Planning phase failed: {e}")
+            # On error, assume write might be needed
+            return {
+                'needs_write': True,
+                'write_target': task.root_folder or project_path,
+                'write_targets': [task.root_folder or project_path] if task.root_folder or project_path else [],
+                'write_target_nums': [],
+                'plan_response': f"Planning failed: {e}",
+                'continue_prompt': None
+            }
+
+    def _get_write_target_for_task(self, task: Task, fallback_path: str) -> Optional[str]:
+        """
+        Determine the write target path for a task.
+
+        This is used to pre-create worktrees before the initial context is sent.
+
+        Args:
+            task: Task object
+            fallback_path: Fallback path if no project is found
+
+        Returns:
+            Path to the repository that needs a worktree, or None if not applicable
+        """
+        # Priority 1: First project with path (regardless of access - we're pre-creating based on branch config)
+        if task.projects:
+            for project in task.projects:
+                project_path = project.get('path', '')
+                # Handle comma-separated paths - use first one
+                if ',' in project_path:
+                    project_path = project_path.split(',')[0].strip()
+                if project_path and os.path.exists(project_path):
+                    # Check if it's a git repo
+                    git_dir = os.path.join(project_path, '.git')
+                    if os.path.exists(git_dir):
+                        logger.info(f"Task {task.id}: Write target from projects: {project_path}")
+                        return project_path
+
+        # Priority 2: Task root_folder
+        if task.root_folder and os.path.exists(task.root_folder):
+            git_dir = os.path.join(task.root_folder, '.git')
+            if os.path.exists(git_dir):
+                logger.info(f"Task {task.id}: Write target from root_folder: {task.root_folder}")
+                return task.root_folder
+
+        # Priority 3: Fallback path
+        if fallback_path and os.path.exists(fallback_path):
+            git_dir = os.path.join(fallback_path, '.git')
+            if os.path.exists(git_dir):
+                logger.info(f"Task {task.id}: Write target from fallback: {fallback_path}")
+                return fallback_path
+
+        logger.warning(f"Task {task.id}: No valid git repository found for worktree creation")
+        return None
+
+    async def _ensure_worktree_for_target(self, db: DBSession, task: Task, write_target: str) -> str:
+        """
+        Create a git worktree for a specific write target.
+
+        Unlike _ensure_worktree_for_write, this doesn't check task.worktree_path
+        and always tries to create a worktree for the given target.
+
+        Args:
+            db: Database session
+            task: Task object
+            write_target: Path to the repo that needs write access
+
+        Returns:
+            Worktree path if created, or the original path if not a git repo
+        """
+        # Check if write_target is a git repo
+        if not write_target or not os.path.exists(write_target):
+            logger.warning(f"Task {task.id}: Write target does not exist: {write_target}")
+            return write_target or "."
+
+        # Check if this is an IDL project - skip worktree creation for IDL
+        project_type = self._get_project_type_for_path(task, write_target)
+        if project_type == "idl":
+            logger.info(f"Task {task.id}: Skipping worktree for IDL project: {write_target} (using default branch)")
+            return write_target
+
+        git_dir = os.path.join(write_target, '.git')
+        if not os.path.exists(git_dir):
+            logger.info(f"Task {task.id}: Write target is not a git repo, using directly: {write_target}")
+            return write_target
+
+        # Create worktree for isolation
+        try:
+            worktree_manager = self.git_worktree_manager_class(write_target)
+
+            # Determine branch name
+            branch_name = task.branch_name or f"task/{task.task_name}"
+            base_branch = task.base_branch or "main"
+
+            success, worktree_path, message = worktree_manager.create_worktree(
+                task_name=task.task_name,
+                branch_name=branch_name,
+                base_branch=base_branch
+            )
+
+            if success and worktree_path:
+                logger.info(f"Task {task.id}: Created worktree at {worktree_path} for {write_target}")
+
+                # Update task branch name if not already set
+                if not task.branch_name:
+                    task.branch_name = branch_name
+                    db.commit()
+
+                return worktree_path
+            else:
+                logger.warning(f"Task {task.id}: Failed to create worktree for {write_target}: {message}")
+                return write_target
+
+        except Exception as e:
+            logger.error(f"Task {task.id}: Error creating worktree for {write_target}: {e}")
+            return write_target
+
+    async def _ensure_worktree_for_write(self, db: DBSession, task: Task, write_target: str) -> str:
+        """
+        Ensure a git worktree exists for write operations.
+
+        Args:
+            db: Database session
+            task: Task object
+            write_target: Path to the repo that needs write access
+
+        Returns:
+            Path to use for execution (worktree path if created, or existing path)
+        """
+        # If already have a worktree, use it
+        if task.worktree_path and os.path.exists(task.worktree_path):
+            logger.info(f"Task {task.id}: Using existing worktree: {task.worktree_path}")
+            return task.worktree_path
+
+        # Check if write_target is a git repo
+        if not write_target or not os.path.exists(write_target):
+            logger.warning(f"Task {task.id}: Write target does not exist: {write_target}")
+            return write_target or "."
+
+        git_dir = os.path.join(write_target, '.git')
+        if not os.path.exists(git_dir):
+            logger.info(f"Task {task.id}: Write target is not a git repo, using directly: {write_target}")
+            return write_target
+
+        # Create worktree for isolation
+        try:
+            worktree_manager = self.git_worktree_manager_class(write_target)
+
+            # Determine branch name
+            branch_name = task.branch_name or f"task/{task.task_name}"
+            base_branch = task.base_branch or "main"
+
+            # Create worktree
+            logger.info(f"Task {task.id}: Creating worktree for branch {branch_name} from {base_branch}")
+            success, worktree_path, message = worktree_manager.create_worktree(
+                task_name=task.task_name,
+                branch_name=branch_name,
+                base_branch=base_branch
+            )
+
+            if success and worktree_path and os.path.exists(worktree_path):
+                # Update task with worktree info
+                task.worktree_path = worktree_path
+                task.branch_name = branch_name
+                db.commit()
+
+                logger.info(f"Task {task.id}: Created worktree at {worktree_path}")
+                return worktree_path
+            else:
+                logger.warning(f"Task {task.id}: Failed to create worktree ({message}), using original path")
+                return write_target
+
+        except Exception as e:
+            logger.error(f"Task {task.id}: Error creating worktree: {e}")
+            return write_target
+
+    def _get_project_type_for_path(self, task: Task, path: str) -> Optional[str]:
+        """
+        Get the project type for a given path from task's projects configuration.
+
+        Args:
+            task: Task object with projects configuration
+            path: Path to look up
+
+        Returns:
+            Project type string (e.g., 'rpc', 'web', 'idl', 'sdk', 'other') or None if not found
+        """
+        if not task.projects:
+            return None
+
+        # Normalize the path for comparison
+        normalized_path = os.path.normpath(path)
+
+        for project in task.projects:
+            project_paths_str = project.get('path', '')
+
+            # Handle comma-separated paths
+            if ',' in project_paths_str:
+                project_paths = [p.strip() for p in project_paths_str.split(',')]
+            else:
+                project_paths = [project_paths_str.strip()]
+
+            for project_path in project_paths:
+                if os.path.normpath(project_path) == normalized_path:
+                    return project.get('project_type', 'other')
+
+        return None
 
     def _get_project_context(self, project_path: str, task) -> str:
         """
@@ -610,10 +1266,13 @@ class TaskExecutor:
                 context += f"Working Directory: Current directory (read-only mode)\n\n"
 
             context += "Project Configuration:\n"
+            idl_projects = []  # Track projects with IDL configuration
             for i, project in enumerate(task.projects, 1):
                 project_context = project.get('context', 'No context provided')
                 access = project.get('access', 'write')
                 branch = project.get('branch_name', 'default')
+                idl_repo = project.get('idl_repo')
+                idl_file = project.get('idl_file')
 
                 context += f"{i}. {project_context}\n"
                 context += f"   - Access: {access}\n"
@@ -621,7 +1280,23 @@ class TaskExecutor:
                     context += f"   - Branch: {branch} (🔒 ISOLATED WORKTREE - changes stay here)\n"
                 else:
                     context += f"   - Read-only access (reference only)\n"
+
+                # Track IDL configuration
+                psm = project.get('psm')
+                if idl_repo or psm:
+                    idl_info = {'repo': idl_repo, 'file': idl_file, 'psm': psm, 'project_context': project_context}
+                    idl_projects.append(idl_info)
+                    if psm:
+                        context += f"   - PSM: {psm}\n"
+                    if idl_repo:
+                        context += f"   - IDL Repository: {idl_repo}\n"
+                    if idl_file:
+                        context += f"   - IDL File: {idl_file}\n"
                 context += "\n"
+
+            # Add IDL workflow instructions if any project has IDL configuration
+            if idl_projects:
+                context += self._get_idl_instructions(idl_projects)
 
             context += "🔒 ISOLATION INSTRUCTIONS:\n"
             context += "- You are working in an ISOLATED WORKTREE environment\n"
@@ -675,6 +1350,71 @@ class TaskExecutor:
             context += f"Error reading working directory: {str(e)}\n"
 
         return context
+
+    def _get_idl_instructions(self, idl_projects: list) -> str:
+        """
+        Generate IDL workflow instructions for projects with IDL configuration.
+
+        This instructs Claude to use the ByteDance overpass MCP tools when working
+        with IDL files to regenerate backend code after IDL changes.
+
+        Args:
+            idl_projects: List of dicts with keys: repo, file, psm, project_context
+
+        Returns:
+            IDL instruction string to include in project context
+        """
+        instructions = "\n📋 IDL WORKFLOW INSTRUCTIONS:\n"
+        instructions += "This project uses IDL (Interface Definition Language) for service definitions.\n\n"
+
+        # List IDL configurations
+        instructions += "IDL Configuration:\n"
+        for idl in idl_projects:
+            if idl.get('psm'):
+                instructions += f"  - PSM: {idl['psm']}\n"
+            if idl.get('repo'):
+                instructions += f"    Repository: {idl['repo']}\n"
+            if idl.get('file'):
+                instructions += f"    File: {idl['file']}\n"
+            instructions += f"    Project: {idl['project_context']}\n"
+
+        # Extract PSM names for tool usage examples
+        psm_names = [idl.get('psm') for idl in idl_projects if idl.get('psm')]
+        psm_example = psm_names[0] if psm_names else "your.service.psm"
+
+        # Add overpass MCP usage instructions
+        instructions += f"""
+⚠️  CRITICAL IDL WORKFLOW:
+When you make changes to IDL files (*.thrift, *.proto, or other IDL formats), you MUST follow this workflow:
+
+1. **Before modifying IDL**: Use the overpass MCP tools to understand the current state:
+   - `get_psm_idl_info` with PSM name (e.g., "{psm_example}") - Get service IDL basic information
+   - `get_psm_method_list` with PSM name - Get IDL method list with method names and comments
+
+2. **After modifying IDL**: You MUST regenerate the backend code:
+   - `generate_psm_repo` with PSM name - Generate overpass code for the PSM
+   - ⚠️  This operation may take several minutes to complete
+   - Wait for code generation to finish before proceeding
+
+3. **Verify the changes**: After code generation:
+   - Check that the generated code compiles correctly
+   - Review the generated client/server stubs
+   - Use `get_psm_repo_info` with PSM name to verify code generation repository info
+
+OVERPASS MCP TOOLS AVAILABLE:
+- `get_psm_idl_info(psm)`: Get service IDL basic information
+- `get_psm_repo_info(psm)`: Get service overpass code generation repository info
+- `get_psm_method_list(psm)`: Get IDL method list including GO method names and comments
+- `generate_psm_repo(psm)`: Generate overpass code for PSM (REQUIRED after IDL changes)
+
+PSM IDENTIFIER(S) FOR THIS PROJECT: {', '.join(psm_names) if psm_names else 'Not configured - please provide PSM name when using tools'}
+
+IMPORTANT: If you modify any IDL file, the backend service code will be out of sync.
+You MUST call `generate_psm_repo` to regenerate the code, otherwise the backend
+will not reflect your IDL changes and the service will fail.
+
+"""
+        return instructions
 
     def _detect_project_info(self, project_path: str) -> str:
         """
@@ -838,11 +1578,11 @@ class TaskExecutor:
         return config_info
 
     def _save_interaction(
-        self, db: DBSession, task_id: str, interaction_type: InteractionType, content: str, usage_data: Optional[Dict] = None
+        self, db: DBSession, task_id: str, interaction_type: InteractionType, content: str, usage_data: Optional[Dict] = None, images: Optional[List[Dict]] = None
     ):
-        """Save an interaction to the database with optional usage data."""
+        """Save an interaction to the database with optional usage data and images."""
         interaction = ClaudeInteraction(
-            task_id=task_id, interaction_type=interaction_type, content=content
+            task_id=task_id, interaction_type=interaction_type, content=content, images=images
         )
 
         # Add usage data if available (from Claude CLI result event)
@@ -942,6 +1682,7 @@ Return the test code you created."""
                 message=test_message,
                 project_path=project_path,
                 session_id=task.claude_session_id,  # Continue the same conversation
+                mcp_servers=task.mcp_servers,
             )
 
             # Update session_id if changed
@@ -1063,9 +1804,9 @@ Return the test code you created."""
 
     def _validate_multi_project_worktrees(self, task) -> Dict[str, any]:
         """
-        Validate that all project worktrees are accessible for multi-project tasks.
+        Validate that all module worktrees are accessible for multi-project tasks.
 
-        CRITICAL: For write-access projects, this validates the WORKTREE paths, not main repo paths.
+        CRITICAL: For write-access modules, this validates the WORKTREE paths, not main repo paths.
 
         Args:
             task: Task object with projects configuration
@@ -1074,70 +1815,379 @@ Return the test code you created."""
             Dict with 'success' boolean and optional 'error' message
         """
         import os
+        import subprocess
 
-        # For multi-project tasks, validate all write-access projects have proper isolation
-        write_projects = [p for p in task.projects if p.get("access") == "write"]
+        # Use parsed modules if available, otherwise fall back to projects config
+        if hasattr(task, '_parsed_modules') and task._parsed_modules:
+            write_modules = [m for m in task._parsed_modules if m.get("access") == "write"]
+        else:
+            # Fallback: parse from projects (handles comma-separated paths)
+            write_modules = []
+            for project in (task.projects or []):
+                if project.get("access") == "write":
+                    paths_str = project.get("path", "")
+                    if ',' in paths_str:
+                        for path in paths_str.split(','):
+                            path = path.strip()
+                            if path:
+                                write_modules.append({"path": path})
+                    elif paths_str:
+                        write_modules.append({"path": paths_str})
 
-        for project in write_projects:
-            main_repo_path = project.get("path")
-            if not main_repo_path:
+        for module in write_modules:
+            module_path = module.get("path")
+            if not module_path:
                 continue
 
-            # CRITICAL FIX: For write-access projects, validate the WORKTREE path, not main repo path
-            if task.task_name:
-                # Construct expected worktree path
-                worktree_path = os.path.join(main_repo_path, ".claude_worktrees", task.task_name)
+            # Check for worktree_path directly in module (set during worktree creation)
+            worktree_path = module.get("worktree_path")
 
-                # Validate worktree exists
-                if not os.path.exists(worktree_path) or not os.path.isdir(worktree_path):
+            # If not set, construct expected worktree path
+            if not worktree_path and task.task_name:
+                # Sanitize task name for directory
+                safe_task_name = task.task_name.replace("/", "_").replace(" ", "_")
+                worktree_path = os.path.join(module_path, ".claude_worktrees", safe_task_name)
+
+            if not worktree_path:
+                continue
+
+            # Validate worktree exists
+            if not os.path.exists(worktree_path) or not os.path.isdir(worktree_path):
+                return {
+                    "success": False,
+                    "error": f"Module worktree path not found: {worktree_path} (module: {module_path})"
+                }
+
+            # Verify git worktree for write-access modules
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--is-inside-work-tree"],
+                    cwd=worktree_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode != 0:
                     return {
                         "success": False,
-                        "error": f"Multi-project worktree path not found: {worktree_path} (derived from main repo: {main_repo_path})"
+                        "error": f"Worktree path is not a valid git worktree: {worktree_path}"
                     }
 
-                # Verify git worktree for write-access projects
-                try:
-                    import subprocess
-                    result = subprocess.run(
-                        ["git", "rev-parse", "--is-inside-work-tree"],
-                        cwd=worktree_path,
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if result.returncode != 0:
-                        return {
-                            "success": False,
-                            "error": f"Worktree path is not a valid git worktree: {worktree_path}"
-                        }
+                # Also validate that it's on the expected branch
+                branch_result = subprocess.run(
+                    ["git", "branch", "--show-current"],
+                    cwd=worktree_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if branch_result.returncode == 0:
+                    current_branch = branch_result.stdout.strip()
+                    expected_branch = module.get('branch_name', task.branch_name)
+                    if expected_branch and current_branch != expected_branch:
+                        logger.warning(f"Task {task.id}: Worktree branch mismatch. Expected: {expected_branch}, Current: {current_branch}")
+                    else:
+                        logger.info(f"Task {task.id}: Worktree validation successful for {module_path} - branch: {current_branch}")
 
-                    # Also validate that it's on the expected branch
-                    branch_result = subprocess.run(
-                        ["git", "branch", "--show-current"],
-                        cwd=worktree_path,
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    if branch_result.returncode == 0:
-                        current_branch = branch_result.stdout.strip()
-                        expected_branch = project.get('branch_name', task.branch_name)
-                        if expected_branch and current_branch != expected_branch:
-                            logger.warning(f"Task {task.id}: Worktree branch mismatch. Expected: {expected_branch}, Current: {current_branch}")
-                        else:
-                            logger.info(f"Task {task.id}: Worktree validation successful - branch: {current_branch}")
-
-                except Exception as e:
-                    return {
-                        "success": False,
-                        "error": f"Could not validate git worktree for {worktree_path}: {e}"
-                    }
-            else:
-                # Fallback: validate main repo path if no task name
-                if not os.path.exists(main_repo_path) or not os.path.isdir(main_repo_path):
-                    return {
-                        "success": False,
-                        "error": f"Multi-project main repo path not found: {main_repo_path}"
-                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Could not validate git worktree for {worktree_path}: {e}"
+                }
 
         return {"success": True}
+
+    def _parse_module_paths(self, task: Task) -> List[Dict[str, str]]:
+        """
+        Parse comma-separated paths in project config to get individual modules.
+
+        Each project's path field can contain comma-separated paths, where each
+        path is an independent git repo (module).
+
+        Args:
+            task: Task object with projects configuration
+
+        Returns:
+            List of module dicts with 'path', 'context', 'project_index' keys
+        """
+        modules = []
+
+        if not task.projects:
+            return modules
+
+        for project_idx, project in enumerate(task.projects):
+            paths_str = project.get('path', '')
+            context = project.get('context', 'No context provided')
+
+            # Split comma-separated paths
+            if ',' in paths_str:
+                individual_paths = [p.strip() for p in paths_str.split(',') if p.strip()]
+            else:
+                individual_paths = [paths_str.strip()] if paths_str.strip() else []
+
+            # Create a module entry for each individual path
+            for path in individual_paths:
+                if path and os.path.exists(path):
+                    # Try to get module name from path
+                    module_name = os.path.basename(path.rstrip('/'))
+                    modules.append({
+                        'path': path,
+                        'context': context,
+                        'module_name': module_name,
+                        'project_index': project_idx,
+                        'access': 'read'  # Start with read-only
+                    })
+                else:
+                    logger.warning(f"Task {task.id}: Module path does not exist: {path}")
+
+        logger.info(f"Task {task.id}: Parsed {len(modules)} modules from project config")
+        return modules
+
+    async def _run_planning_phase(self, db: DBSession, task: Task, project_path: str) -> List[str]:
+        """
+        Run planning phase to identify which modules need write access.
+
+        Claude analyzes the task and identifies which modules (individual git repos)
+        need modification. Returns list of module paths that need write access.
+
+        Args:
+            db: Database session
+            task: Task object
+            project_path: Initial project path (read-only access)
+
+        Returns:
+            List of module paths that need write access
+        """
+        logger.info(f"Task {task.id}: Running planning phase to identify write targets")
+
+        # Parse all modules from project config (handles comma-separated paths)
+        modules = self._parse_module_paths(task)
+
+        if not modules:
+            logger.warning(f"Task {task.id}: No valid modules found in project config")
+            return []
+
+        # Store parsed modules in task for later use
+        task._parsed_modules = modules
+
+        # Build planning prompt with individual modules - use numbered list with exact paths
+        modules_info = ""
+        modules_list = ""
+        for i, module in enumerate(modules, 1):
+            path = module.get('path', 'unknown')
+            module_name = module.get('module_name', 'unknown')
+            context = module.get('context', 'No context')
+            modules_info += f"[{i}] {path}\n    Name: {module_name}\n    Context: {context}\n\n"
+            modules_list += f"[{i}] {path}\n"
+
+        planning_prompt = f"""PLANNING PHASE - Analyze this task and identify which modules need modification.
+
+Task Description: {task.description}
+
+Available Modules (each is an independent git repository):
+{modules_info}
+CRITICAL INSTRUCTION - You MUST respond with EXACTLY this format:
+
+```write_targets
+[numbers of modules that need write access, one per line]
+```
+
+Example - if modules [1] and [3] need modification:
+```write_targets
+1
+3
+```
+
+Example - if no modules need modification:
+```write_targets
+NONE
+```
+
+Available module numbers:
+{modules_list}
+RULES:
+- ONLY output numbers (1, 2, 3, etc.) or NONE inside the write_targets block
+- Do NOT include paths, names, or any other text inside the block
+- One number per line
+- Numbers must match the module list above
+
+After the write_targets block, explain your reasoning and provide a brief implementation plan.
+Do NOT make any file changes yet - this is only the planning phase."""
+
+        try:
+            # Save planning message as SYSTEM_MESSAGE (not user message)
+            self._save_interaction(db, task.id, InteractionType.SYSTEM_MESSAGE, planning_prompt)
+            db.commit()
+
+            # Send planning message to Claude
+            response, pid, session_id, usage_data = await self.streaming_client.send_message_streaming(
+                message=planning_prompt,
+                project_path=project_path,
+                session_id=task.claude_session_id,
+                mcp_servers=task.mcp_servers,
+            )
+
+            # Store session_id for conversation continuity
+            if session_id:
+                task.claude_session_id = session_id
+            task.process_pid = pid
+            db.commit()
+
+            # Save Claude's response
+            self._save_interaction(db, task.id, InteractionType.CLAUDE_RESPONSE, response, usage_data)
+
+            # Parse write targets from response (use parsed modules)
+            write_targets = self._parse_write_targets(response, modules)
+
+            logger.info(f"Task {task.id}: Planning phase identified write targets: {write_targets}")
+            return write_targets
+
+        except Exception as e:
+            logger.error(f"Task {task.id}: Planning phase failed: {e}")
+            # On error, fall back to write access for all modules
+            return [m.get('path') for m in modules if m.get('path')]
+
+    def _parse_write_targets(self, response: str, modules: List[Dict]) -> List[str]:
+        """
+        Parse Claude's response to extract write target paths.
+
+        Expects Claude to respond with module numbers (1-indexed) in a write_targets block.
+
+        Args:
+            response: Claude's planning response
+            modules: List of module configurations (parsed from project config)
+
+        Returns:
+            List of module paths that need write access
+        """
+        write_targets = []
+
+        # Look for write_targets block
+        pattern = r'```write_targets\s*(.*?)\s*```'
+        match = re.search(pattern, response, re.DOTALL | re.IGNORECASE)
+
+        if match:
+            targets_text = match.group(1).strip()
+            if targets_text.upper() != 'NONE':
+                # Parse module numbers
+                for line in targets_text.split('\n'):
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+
+                    # Try to extract number from the line
+                    # Handle formats like "1", "[1]", "1.", "1)", etc.
+                    num_match = re.search(r'^\[?(\d+)\]?[.):]?\s*$', line)
+                    if num_match:
+                        module_num = int(num_match.group(1))
+                        # Convert 1-indexed to 0-indexed
+                        module_idx = module_num - 1
+                        if 0 <= module_idx < len(modules):
+                            module_path = modules[module_idx].get('path', '')
+                            if module_path and module_path not in write_targets:
+                                write_targets.append(module_path)
+                                logger.info(f"Planning: Module {module_num} ({module_path}) needs write access")
+                        else:
+                            logger.warning(f"Planning: Invalid module number {module_num}, max is {len(modules)}")
+                    else:
+                        # Fallback: try to match as path
+                        for module in modules:
+                            module_path = module.get('path', '')
+                            if line == module_path or module_path.endswith('/' + line):
+                                if module_path not in write_targets:
+                                    write_targets.append(module_path)
+                                    logger.info(f"Planning: Module path {module_path} needs write access")
+                                break
+        else:
+            logger.warning("Planning: No write_targets block found in response")
+
+        return write_targets
+
+    async def _create_dynamic_worktrees(self, db: DBSession, task: Task, write_targets: List[str]) -> Dict[str, str]:
+        """
+        Dynamically create git worktrees for modules that need write access.
+
+        Each module is an independent git repo. Worktrees are created with the task name
+        to provide isolation for code changes.
+
+        Args:
+            db: Database session
+            task: Task object
+            write_targets: List of module paths needing write access
+
+        Returns:
+            Dict mapping original module paths to worktree paths
+        """
+        worktree_map = {}
+
+        if not write_targets:
+            logger.info(f"Task {task.id}: No write targets - skipping worktree creation")
+            return worktree_map
+
+        # Generate branch name from task (used for all modules)
+        branch_name = task.branch_name
+        if not branch_name:
+            sanitized_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', task.task_name)
+            sanitized_name = re.sub(r'_+', '_', sanitized_name).strip('_')
+            branch_name = f"task/{sanitized_name}"
+
+        logger.info(f"Task {task.id}: Creating worktrees for {len(write_targets)} modules with branch '{branch_name}'")
+
+        for module_path in write_targets:
+            try:
+                # Check if it's a git repo
+                import subprocess
+                result = subprocess.run(
+                    ["git", "rev-parse", "--git-dir"],
+                    cwd=module_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if result.returncode != 0:
+                    logger.warning(f"Task {task.id}: {module_path} is not a git repo, skipping worktree")
+                    continue
+
+                # Create worktree for this module
+                git_manager = self.git_worktree_manager_class(module_path)
+
+                # Use task name for worktree (creates worktree at {module}/.claude_worktrees/{task_name})
+                success, worktree_path, message = git_manager.create_worktree(
+                    task.task_name,
+                    branch_name,
+                    task.base_branch
+                )
+
+                if success:
+                    worktree_map[module_path] = worktree_path
+                    logger.info(f"Task {task.id}: Created worktree for module {module_path} -> {worktree_path}")
+
+                    # Update parsed modules if available
+                    if hasattr(task, '_parsed_modules') and task._parsed_modules:
+                        for module in task._parsed_modules:
+                            if module.get('path') == module_path:
+                                module['access'] = 'write'
+                                module['worktree_path'] = worktree_path
+                                break
+                else:
+                    logger.error(f"Task {task.id}: Failed to create worktree for module {module_path}: {message}")
+
+            except Exception as e:
+                logger.error(f"Task {task.id}: Error creating worktree for module {module_path}: {e}")
+
+        # Update task with worktree info
+        if worktree_map:
+            # Use first worktree as primary working path
+            task.worktree_path = list(worktree_map.values())[0]
+            task.branch_name = branch_name
+
+            # Store all worktree mappings in task for reference
+            if not hasattr(task, '_worktree_map'):
+                task._worktree_map = {}
+            task._worktree_map.update(worktree_map)
+
+            db.commit()
+            logger.info(f"Task {task.id}: Created {len(worktree_map)} worktrees, primary: {task.worktree_path}")
+
+        return worktree_map

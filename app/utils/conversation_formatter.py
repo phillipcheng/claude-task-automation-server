@@ -19,7 +19,8 @@ def collapse_consecutive_tool_results(interactions_list, collapse_tools=True):
                 "id": interaction.id,
                 "type": interaction.interaction_type.value,
                 "content": interaction.content,
-                "timestamp": interaction.created_at.isoformat()
+                "timestamp": interaction.created_at.isoformat(),
+                "images": interaction.images if hasattr(interaction, 'images') and interaction.images else None
             }
             for interaction in interactions_list
             if interaction.content and interaction.content.strip()  # Filter out empty content
@@ -103,7 +104,8 @@ def collapse_consecutive_tool_results(interactions_list, collapse_tools=True):
                     "id": interaction.id,
                     "type": interaction.interaction_type.value,
                     "content": interaction.content,
-                    "timestamp": interaction.created_at.isoformat()
+                    "timestamp": interaction.created_at.isoformat(),
+                    "images": interaction.images if hasattr(interaction, 'images') and interaction.images else None
                 })
 
         i += 1

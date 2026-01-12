@@ -80,6 +80,17 @@ class Task(Base):
     # If False (default), intelligent auto-responder keeps conversation going
     chat_mode = Column(Boolean, default=False, nullable=False)
 
+    # Tool configuration
+    # allowed_tools: List of tool names to allow (e.g., ["Bash", "Edit", "Read", "Grep"])
+    # If empty/null, all default tools are available
+    # Use "default" for all tools, or specific tool names
+    allowed_tools = Column(JSON, nullable=True)
+
+    # MCP servers configuration for custom tools
+    # Format: {"serverName": {"command": "npx", "args": [...], "env": {...}}, ...}
+    # These are passed to Claude CLI via --mcp-config
+    mcp_servers = Column(JSON, nullable=True)
+
     # Process tracking
     process_pid = Column(Integer, nullable=True)
 
